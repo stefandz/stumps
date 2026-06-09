@@ -231,7 +231,7 @@ def _winprob_block(est: WinEstimate, accent: str) -> Group:
     }.get(est.method, est.method)
     for line in est.extra:
         rows.append(Text(line, style="dim"))
-    rows.append(Text(f"{method_tag} · {est.note}", style="dim italic"))
+    rows.append(Text(method_tag, style="dim italic"))
     return Group(*rows)
 
 
@@ -274,9 +274,6 @@ def _match_panel(match: Match, cls: Classification, settings) -> Panel:
         est = estimate(match, settings)
         if est is not None:
             body.append(_winprob_block(est, accent))
-
-    if cls.reasons:
-        body.append(Text("Why shown: " + "; ".join(cls.reasons), style="dim italic"))
 
     title = Text()
     title.append(_phase_badge(match))
