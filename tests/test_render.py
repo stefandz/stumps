@@ -49,6 +49,25 @@ def test_batting_and_bowling_have_column_headers():
         assert col in out
 
 
+def test_headline_synthesises_chase_target():
+    live = next(m for m in sample_matches() if m.match_id == "demo-ind-nz-wc")
+    out = _render(live, _settings())
+    assert "need" in out and "from" in out  # "India need 71 runs from 72 balls"
+
+
+def test_headline_lead_trail_for_test():
+    test_match = next(m for m in sample_matches() if m.format is Format.TEST)
+    out = _render(test_match, _settings())
+    assert "trail by" in out or "lead by" in out
+
+
+def test_recent_balls_section_rendered():
+    live = next(m for m in sample_matches() if m.match_id == "demo-ind-nz-wc")
+    out = _render(live, _settings())
+    assert "Recent" in out
+    assert "FOUR" in out and "OUT" in out  # boundary + wicket commentary shown
+
+
 def test_dls_only_in_play():
     completed = next(m for m in sample_matches() if m.phase is Phase.COMPLETE)
     assert "DLS" not in _render(completed, _settings())

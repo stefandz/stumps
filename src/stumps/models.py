@@ -133,6 +133,18 @@ class Bowler:
 
 
 @dataclass
+class Ball:
+    """A single delivery, for the recent ball-by-ball insights section."""
+
+    over: str  # cricket notation, e.g. "12.3"
+    description: str  # concise commentary, e.g. "Boult to Kohli, FOUR"
+    runs: int = 0
+    is_wicket: bool = False
+    is_boundary: bool = False  # four or six off the bat
+    period: int = 1  # innings number
+
+
+@dataclass
 class Innings:
     batting_team: str
     bowling_team: str = ""
@@ -182,6 +194,8 @@ class Match:
     total_days: int | None = None
     session: str = ""  # "Lunch", "Tea", "Stumps", ...
     source: str = ""  # which data source produced this
+    ball_by_ball_available: bool = False  # does the source expose commentary?
+    recent_balls: list[Ball] = field(default_factory=list)  # most recent first
 
     # --- convenience views -------------------------------------------------
 

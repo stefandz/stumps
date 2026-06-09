@@ -10,9 +10,11 @@ about, prioritised the way an England fan thinks about it:
    Blast, The Hundred, women's regional competitions.
 4. Everything else last (and only if it's a live international).
 
-For each match you get the live score, current **batting & bowling figures**, a
-**DLS par score** in limited-overs games (a "are they ahead or behind?"
-indicator), end-of-day / stumps summaries for multi-day games, and a
+For each match you get the live score, a synthesised headline ("India need 71
+runs from 72 balls", "Hampshire trail by 221"), current **batting & bowling
+figures**, the **last few balls** of commentary (with wickets and boundaries
+flagged), a **DLS par score** in limited-overs games (a "are they ahead or
+behind?" indicator), end-of-day / stumps summaries for multi-day games, and a
 **win-probability estimate**.
 
 ```

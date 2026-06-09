@@ -197,6 +197,35 @@ def test_espn_innings_from_summary_linescores():
     assert innings[1].closed is False and innings[1].target == 285
 
 
+def test_espn_ball_parsing():
+    wicket = EspnSource._ball({
+        "over": {"number": 37, "ball": 2}, "scoreValue": 0,
+        "playType": {"description": "out"}, "dismissal": {"type": "caught"},
+        "shortText": "Boult to Pant, OUT", "period": 2,
+    })
+    assert wicket.over == "37.2" and wicket.is_wicket and not wicket.is_boundary
+    four = EspnSource._ball({
+        "over": {"number": 38, "ball": 0}, "scoreValue": 4,
+        "playType": {"description": "four"}, "shortText": "Boult to Kohli, FOUR",
+        "period": 2,
+    })
+    assert four.is_boundary and four.runs == 4 and not four.is_wicket
+
+
+def test_espn_recent_balls_newest_first(settings):
+    src = EspnSource(settings)
+    pages = {
+        1: {"commentary": {"pageCount": 2, "items": [
+            {"over": {"number": 1, "ball": 1}, "shortText": "ball 1"}]}},
+        2: {"commentary": {"pageCount": 2, "items": [
+            {"over": {"number": 40, "ball": i}, "shortText": f"ball 40.{i}"}
+            for i in range(1, 5)]}},
+    }
+    src._get = lambda url: pages[1 if "page=1" in url else 2]  # type: ignore[assignment]
+    balls = src._recent_balls("e", limit=3)
+    assert [b.over for b in balls] == ["40.4", "40.3", "40.2"]  # newest first, capped
+
+
 # -- aggregator fallback ----------------------------------------------------
 
 

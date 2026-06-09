@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import Any
 
 from stumps import config
-from stumps.models import Batter, Bowler, Format, Innings, Match, Phase, Team
+from stumps.models import Ball, Batter, Bowler, Format, Innings, Match, Phase, Team
 from stumps.sources.base import DataSource, DiskCache, SourceError
 
 _SCOREBOARD = (
@@ -27,6 +27,9 @@ _SCOREBOARD = (
     "?sport=cricket&region=gb"
 )
 _SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/cricket/{league}/summary?event={event}"
+# Ball-by-ball commentary uses a fixed cricket league id (8676) regardless of the
+# actual series, and paginates oldest-first (25 balls/page).
+_PLAYBYPLAY = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/8676/playbyplay?event={event}&page={page}"
 
 # internationalClassId -> Format (the reliable signal for internationals).
 _INTL_CLASS = {1: Format.TEST, 2: Format.ODI, 3: Format.T20I,
@@ -145,6 +148,7 @@ class EspnSource(DataSource):
         if phase is Phase.COMPLETE:
             match.result_text = status
         match.day_number, match.total_days = _parse_day(status)
+        match.ball_by_ball_available = bool(event.get("playByPlayAvailable"))
         return match
 
     def _format(self, cls: dict, event_type: str) -> Format:
@@ -218,7 +222,45 @@ class EspnSource(DataSource):
         innings = self._innings_from_summary(data)
         if innings:
             match.innings = innings
+        if match.ball_by_ball_available and match.phase.is_active_today:
+            match.recent_balls = self._recent_balls(match.match_id)
         return match
+
+    def _recent_balls(self, event_id: str, limit: int = 6) -> list[Ball]:
+        """Most recent deliveries (newest first). Commentary paginates
+        oldest-first, so we read page 1 for the page count, then the last page."""
+        try:
+            first = self._get(_PLAYBYPLAY.format(event=event_id, page=1))
+        except SourceError:
+            return []
+        commentary = first.get("commentary") or {}
+        page_count = _to_int(commentary.get("pageCount"), 1)
+        items = commentary.get("items") or []
+        if page_count > 1:
+            try:
+                last = self._get(_PLAYBYPLAY.format(event=event_id, page=page_count))
+                items = (last.get("commentary") or {}).get("items") or items
+            except SourceError:
+                pass
+        balls = [self._ball(it) for it in items if it.get("over")]
+        return list(reversed(balls))[:limit]  # newest first
+
+    @staticmethod
+    def _ball(item: dict) -> Ball:
+        over = item.get("over") or {}
+        over_str = f"{_to_int(over.get('number'))}.{_to_int(over.get('ball'))}"
+        runs = _to_int(item.get("scoreValue"))
+        play = (_dig(item, "playType", "description") or "").lower()
+        is_wicket = bool(item.get("dismissal")) or "out" in play or "wicket" in play
+        is_boundary = runs in (4, 6) and "bye" not in play
+        return Ball(
+            over=over_str,
+            description=item.get("shortText") or item.get("text") or "",
+            runs=runs,
+            is_wicket=is_wicket,
+            is_boundary=is_boundary,
+            period=_to_int(item.get("period"), 1),
+        )
 
     def _innings_from_summary(self, data: dict) -> list[Innings]:
         comp = (_dig(data, "header", "competitions") or [{}])[0]

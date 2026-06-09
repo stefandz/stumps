@@ -115,6 +115,68 @@ def _bowling_table(inns) -> Table | None:
     return t
 
 
+def _lead_trail(match: Match) -> str:
+    """Lead/trail line for a multi-day game, once both sides have batted."""
+    names = match.team_names
+    if len(names) < 2:
+        return ""
+
+    def total(team: str) -> int:
+        return sum(i.runs for i in match.innings if team.lower() in i.batting_team.lower())
+
+    def has_batted(team: str) -> bool:
+        return any(team.lower() in i.batting_team.lower() for i in match.innings)
+
+    current = match.current_innings
+    if current is None:
+        return ""
+    batting = current.batting_team
+    others = [n for n in names if n.lower() not in batting.lower()]
+    if not others or not (has_batted(batting) and has_batted(others[0])):
+        return ""
+    net = total(batting) - total(others[0])
+    if net > 0:
+        return f"{batting} lead by {net}"
+    if net < 0:
+        return f"{batting} trail by {-net}"
+    return "Scores level"
+
+
+def _headline(match: Match) -> str:
+    """Best status line: a synthesised chase/lead phrase for active matches,
+    else the source's own status (result, schedule, rain note...)."""
+    if match.phase.is_active_today:
+        chase = extract_chase_state(match)
+        if chase and chase.runs_needed > 0 and chase.balls_remaining > 0:
+            runs = "run" if chase.runs_needed == 1 else "runs"
+            balls = "ball" if chase.balls_remaining == 1 else "balls"
+            return (
+                f"{chase.chasing_team} need {chase.runs_needed} {runs} "
+                f"from {chase.balls_remaining} {balls}"
+            )
+        if match.format.is_multi_day:
+            line = _lead_trail(match)
+            if line:
+                return line
+    return match.status_text
+
+
+def _recent_balls_block(match: Match) -> Group | None:
+    if not match.recent_balls:
+        return None
+    rows: list = [Text("Recent", style="bold dim")]
+    for b in match.recent_balls:
+        line = Text()
+        line.append(f"{b.over:>5}  ", style="dim")
+        if b.is_wicket:
+            line.append("W ", style="bold white on red")
+        elif b.is_boundary:
+            line.append(f"{b.runs} ", style="bold green")
+        line.append(b.description)
+        rows.append(line)
+    return Group(*rows)
+
+
 def _g50_for(match: Match) -> float:
     if match.format in {Format.WODI, Format.LIST_A} and match.is_womens:
         return G50_ASSOCIATE_OR_WOMENS_ODI
@@ -177,11 +239,13 @@ def _match_panel(match: Match, cls: Classification, settings) -> Panel:
     accent = _TIER_ACCENT.get(cls.tier, "white")
     body: list = []
 
-    # Status headline — skip bare state words (the phase badge already says it).
-    if match.status_text and match.status_text.strip().lower() not in {
+    # Status headline — synthesised ("need 71 from 72", "trail by 245") where we
+    # can, else the source's. Skip bare state words (the badge already says it).
+    headline = _headline(match)
+    if headline and headline.strip().lower() not in {
         "live", "stumps", "tea", "lunch", "drinks", "close", "close of play",
     }:
-        body.append(Text(match.status_text, style="bold"))
+        body.append(Text(headline, style="bold"))
 
     body.append(_scores_line(match))
 
@@ -202,6 +266,10 @@ def _match_panel(match: Match, cls: Classification, settings) -> Panel:
         dls_line = _dls_line(match)
         if dls_line is not None:
             body.append(dls_line)
+
+        recent = _recent_balls_block(match)
+        if recent is not None:
+            body.append(recent)
 
         est = estimate(match, settings)
         if est is not None:

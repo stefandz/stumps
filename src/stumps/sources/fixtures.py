@@ -9,7 +9,7 @@ when running offline. The data is invented but realistic.
 from __future__ import annotations
 
 from stumps.config import Settings
-from stumps.models import Batter, Bowler, Format, Innings, Match, Phase, Team
+from stumps.models import Ball, Batter, Bowler, Format, Innings, Match, Phase, Team
 from stumps.sources.base import DataSource
 
 
@@ -126,6 +126,15 @@ def _world_cup_odi_chase_live() -> Match:
         venue="Eden Gardens, Kolkata",
         status_text="India need 71 runs from 72 balls",
         source="demo",
+        ball_by_ball_available=True,
+        recent_balls=[
+            Ball("38.0", "Boult to Kohli, FOUR, driven through cover", 4, is_boundary=True, period=2),
+            Ball("37.5", "Boult to Kohli, no run", 0, period=2),
+            Ball("37.4", "Boult to Rahul, 1 run", 1, period=2),
+            Ball("37.3", "Boult to Rahul, SIX over long-on", 6, is_boundary=True, period=2),
+            Ball("37.2", "Boult to Pant, OUT, edged to slip!", 0, is_wicket=True, period=2),
+            Ball("37.1", "Boult to Pant, 2 runs", 2, period=2),
+        ],
         innings=[
             Innings(
                 batting_team="New Zealand",
