@@ -1,14 +1,15 @@
-"""Classify and rank matches by how much *this* cricket lover cares.
+"""Classify and rank matches by how much *this* fan cares, given preferences.
 
-Priority policy (from the user):
-  1. England — men's or women's, any format — ALWAYS first.
+Priority policy:
+  1. Your followed team(s) — any format, men's or women's — first.
   2. Then top-tier Test matches (two ICC full members) and premier ICC
      tournaments (World Cup, T20 World Cup, Champions Trophy, WTC final).
-  3. Then English domestic cricket, all formats.
+  3. Then your home domestic cricket (England by default; India/Australia/…).
   4. Everything else, last (and by default only if it's a live international).
 
 Within a tier: live games first, then ones paused at stumps / a break, then
-recently finished (for end-of-day summaries), then upcoming.
+recently finished (for end-of-day summaries), then upcoming. Filtering (formats,
+gender, phase, series, tier floor) is applied here too, driven by Preferences.
 """
 
 from __future__ import annotations
@@ -18,22 +19,23 @@ from enum import IntEnum
 
 from stumps import config
 from stumps.models import Format, Match, Phase
+from stumps.options import Preferences
 
 
 class Tier(IntEnum):
-    ENGLAND = 0
+    FOLLOWED = 0  # one of your followed teams
     PREMIER = 1  # top-tier Test or ICC tournament
-    ENGLISH_DOMESTIC = 2
+    HOME_DOMESTIC = 2
     OTHER = 3
 
 
 @dataclass
 class Classification:
     tier: Tier
-    is_england: bool = False
+    is_followed: bool = False
     is_top_tier_test: bool = False
     is_icc_tournament: bool = False
-    is_english_domestic: bool = False
+    is_home_domestic: bool = False
     reasons: list[str] = field(default_factory=list)
 
 
@@ -41,16 +43,16 @@ def _lower_names(match: Match) -> list[str]:
     return [t.name.lower() for t in match.teams]
 
 
-def _any_nation(names: list[str], allow: frozenset[str]) -> bool:
-    """True if any team name contains one of the allow-listed nation/team names
-    (substring match handles 'England Women', 'Australia A', etc.)."""
+def _any_fragment(names: list[str], allow) -> bool:
+    """True if any team name contains one of the allow-listed fragments."""
     return any(a in name for name in names for a in allow)
 
 
-def is_england_match(match: Match) -> bool:
+def is_followed(match: Match, followed_teams: list[str]) -> bool:
+    if not followed_teams:
+        return False
     names = _lower_names(match)
-    # Exclude domestic English counties (which never contain "england").
-    return any("england" in n or n == "eng" for n in names)
+    return any(team in name for name in names for team in followed_teams)
 
 
 def is_top_tier_test(match: Match) -> bool:
@@ -65,9 +67,11 @@ def is_top_tier_test(match: Match) -> bool:
     )
 
 
-def is_icc_tournament(match: Match) -> bool:
+def is_icc_tournament(match: Match, *, include_warmups: bool = False) -> bool:
     series = match.series_name.lower()
-    if any(excl in series for excl in config.ICC_TOURNAMENT_EXCLUSIONS):
+    if not include_warmups and any(
+        excl in series for excl in config.ICC_TOURNAMENT_EXCLUSIONS
+    ):
         return False  # warm-up / qualifier / League Two — not the event itself
     return any(marker in series for marker in config.ICC_TOURNAMENT_MARKERS)
 
@@ -80,47 +84,58 @@ def is_minor_cricket(match: Match) -> bool:
     )
 
 
-def is_english_domestic(match: Match) -> bool:
-    if match.format.is_international or is_minor_cricket(match):
+def is_home_domestic(match: Match, domestic: str | None = "england") -> bool:
+    if domestic is None or match.format.is_international or is_minor_cricket(match):
+        return False
+    scene = config.DOMESTIC_SCENES.get(domestic)
+    if scene is None:
         return False
     names = _lower_names(match)
     series = match.series_name.lower()
-    if _any_nation(names, config.ENGLISH_DOMESTIC_TEAMS):
+    if _any_fragment(names, scene.teams):
         return True
-    return any(marker in series for marker in config.ENGLISH_DOMESTIC_SERIES_MARKERS)
+    return any(marker in series for marker in scene.series_markers)
 
 
-def classify(match: Match) -> Classification:
-    england = is_england_match(match)
+def is_womens(match: Match) -> bool:
+    if match.format.is_womens:
+        return True
+    blob = (match.series_name + " " + " ".join(match.team_names)).lower()
+    return "women" in blob
+
+
+def classify(match: Match, prefs: Preferences | None = None) -> Classification:
+    prefs = prefs or Preferences()
+    followed = is_followed(match, prefs.followed_teams)
     top_test = is_top_tier_test(match)
-    icc = is_icc_tournament(match)
-    domestic = is_english_domestic(match)
+    icc = is_icc_tournament(match, include_warmups=prefs.include_warmups)
+    domestic = is_home_domestic(match, prefs.domestic)
 
     reasons: list[str] = []
-    if england:
-        reasons.append("England national side")
+    if followed:
+        reasons.append("followed team")
     if top_test:
         reasons.append("top-tier Test")
     if icc:
         reasons.append("ICC tournament")
     if domestic:
-        reasons.append("English domestic")
+        reasons.append("home domestic")
 
-    if england:
-        tier = Tier.ENGLAND
+    if followed:
+        tier = Tier.FOLLOWED
     elif top_test or icc:
         tier = Tier.PREMIER
     elif domestic:
-        tier = Tier.ENGLISH_DOMESTIC
+        tier = Tier.HOME_DOMESTIC
     else:
         tier = Tier.OTHER
 
     return Classification(
         tier=tier,
-        is_england=england,
+        is_followed=followed,
         is_top_tier_test=top_test,
         is_icc_tournament=icc,
-        is_english_domestic=domestic,
+        is_home_domestic=domestic,
         reasons=reasons,
     )
 
@@ -163,25 +178,52 @@ def _sort_key(item: tuple[Match, Classification]) -> tuple:
     )
 
 
+def _passes_tier(match: Match, cls: Classification, prefs: Preferences) -> bool:
+    if prefs.tier_floor >= Tier.OTHER:  # "all"
+        return True
+    if int(cls.tier) <= prefs.tier_floor:
+        return True
+    # When the floor includes domestic, still surface a live international that
+    # didn't otherwise qualify (e.g. a marquee game between two teams you don't
+    # follow) — but not for the stricter followed/premier floors.
+    return (
+        prefs.tier_floor >= Tier.HOME_DOMESTIC
+        and match.phase.is_active_today
+        and match.format.is_international
+    )
+
+
+def _passes_filters(match: Match, prefs: Preferences) -> bool:
+    if prefs.formats is not None and match.format not in prefs.formats:
+        return False
+    if prefs.live_only and not match.phase.is_active_today:
+        return False
+    if not prefs.show_finished and match.phase in {Phase.COMPLETE, Phase.ABANDONED}:
+        return False
+    if not prefs.show_upcoming and match.phase is Phase.UPCOMING:
+        return False
+    if prefs.gender == "women" and not is_womens(match):
+        return False
+    if prefs.gender == "men" and is_womens(match):
+        return False
+    if prefs.series_filter and prefs.series_filter.lower() not in match.series_name.lower():
+        return False
+    return True
+
+
 def prioritise(
-    matches: list[Match], *, include_all: bool = False
+    matches: list[Match], prefs: Preferences | None = None
 ) -> list[tuple[Match, Classification]]:
-    """Return matches the user cares about, most-relevant first, each paired
-    with its :class:`Classification`.
+    """Return matches the fan cares about, most-relevant first, each paired with
+    its :class:`Classification`, after applying their preferences' filters."""
+    prefs = prefs or Preferences()
+    kept = []
+    for match in matches:
+        cls = classify(match, prefs)
+        if _passes_tier(match, cls, prefs) and _passes_filters(match, prefs):
+            kept.append((match, cls))
 
-    By default we keep tiers 0-2 (England, premier, English domestic) plus any
-    *live* international from the catch-all tier. ``include_all=True`` keeps
-    everything (useful with a ``--all`` flag).
-    """
-    classified = [(m, classify(m)) for m in matches]
-
-    if not include_all:
-        kept = []
-        for match, cls in classified:
-            if cls.tier != Tier.OTHER:
-                kept.append((match, cls))
-            elif match.phase.is_active_today and match.format.is_international:
-                kept.append((match, cls))
-        classified = kept
-
-    return sorted(classified, key=_sort_key)
+    ordered = sorted(kept, key=_sort_key)
+    if prefs.limit is not None:
+        ordered = ordered[: prefs.limit]
+    return ordered

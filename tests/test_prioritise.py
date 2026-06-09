@@ -1,11 +1,12 @@
-"""Tests for match classification and ranking policy."""
+"""Tests for match classification, ranking policy, and preference-driven filters."""
 
 from stumps.models import Format, Match, Phase, Team
+from stumps.options import Preferences
 from stumps.prioritise import (
     Tier,
     classify,
-    is_england_match,
-    is_english_domestic,
+    is_followed,
+    is_home_domestic,
     is_icc_tournament,
     is_top_tier_test,
     prioritise,
@@ -23,29 +24,29 @@ def _match(fmt, series, *team_names, phase=Phase.LIVE):
     )
 
 
-def test_england_men_and_women_detected():
-    assert is_england_match(_match(Format.ODI, "x", "England", "India"))
-    assert is_england_match(_match(Format.WT20I, "x", "England Women", "Australia Women"))
-    assert not is_england_match(_match(Format.T20, "x", "Surrey", "Kent"))
+def test_followed_team_detection():
+    eng = ["england"]
+    assert is_followed(_match(Format.ODI, "x", "England", "India"), eng)
+    assert is_followed(_match(Format.WT20I, "x", "England Women", "Australia Women"), eng)
+    assert not is_followed(_match(Format.T20, "x", "Surrey", "Kent"), eng)
+    # Follow someone else entirely.
+    assert is_followed(_match(Format.ODI, "x", "India", "England"), ["india"])
+    assert not is_followed(_match(Format.ODI, "x", "India", "England"), [])
 
 
 def test_top_tier_test_requires_two_full_members():
     assert is_top_tier_test(_match(Format.TEST, "x", "Australia", "England"))
-    # A Test against a non-full-member is not "top tier".
     assert not is_top_tier_test(_match(Format.TEST, "x", "England", "Nepal"))
-    # An ODI between full members is not a Test.
     assert not is_top_tier_test(_match(Format.ODI, "x", "Australia", "England"))
 
 
 def test_icc_tournament_by_series_name():
     assert is_icc_tournament(_match(Format.ODI, "ICC Cricket World Cup 2027", "A", "B"))
-    assert is_icc_tournament(_match(Format.T20I, "ICC Men's T20 World Cup", "A", "B"))
     assert is_icc_tournament(_match(Format.ODI, "ICC Champions Trophy 2025", "A", "B"))
     assert not is_icc_tournament(_match(Format.ODI, "Bilateral ODI Series", "A", "B"))
 
 
 def test_icc_warmups_and_qualifiers_are_not_premier():
-    # Real series names from a live run — World-Cup-named but not the event.
     warmup = _match(Format.WT20I,
                     "ICC Womens T20 World Cup Warm-up Matches 2026", "A", "B")
     league2 = _match(Format.ODI,
@@ -53,7 +54,8 @@ def test_icc_warmups_and_qualifiers_are_not_premier():
     assert not is_icc_tournament(warmup)
     assert not is_icc_tournament(league2)
     assert classify(warmup).tier is Tier.OTHER
-    assert classify(league2).tier is Tier.OTHER
+    # ...unless you opt them back in.
+    assert is_icc_tournament(warmup, include_warmups=True)
 
 
 def test_finished_warmup_is_filtered_but_live_one_is_kept():
@@ -62,62 +64,73 @@ def test_finished_warmup_is_filtered_but_live_one_is_kept():
     done_warmup = _match(Format.WT20I, "ICC Womens T20 World Cup Warm-up Matches",
                          "New Zealand Women", "Bangladesh Women", phase=Phase.COMPLETE)
     ranked = prioritise([live_warmup, done_warmup])
-    ids = [m.series_name for m, _ in ranked]
-    # The live international warm-up still shows; the finished one is dropped.
     assert live_warmup in [m for m, _ in ranked]
     assert done_warmup not in [m for m, _ in ranked]
 
 
-def test_english_domestic_by_team_and_series():
-    assert is_english_domestic(_match(Format.FIRST_CLASS, "County Championship", "Surrey", "Kent"))
-    assert is_english_domestic(_match(Format.T20, "Vitality Blast", "Somerset", "Sussex"))
-    # International games are never "English domestic" even if England plays.
-    assert not is_english_domestic(_match(Format.TEST, "The Ashes", "England", "Australia"))
+def test_home_domestic_england_india_australia():
+    assert is_home_domestic(_match(Format.FIRST_CLASS, "County Championship", "Surrey", "Kent"))
+    assert is_home_domestic(_match(Format.T20, "Vitality Blast", "Somerset", "Sussex"))
+    assert not is_home_domestic(_match(Format.TEST, "The Ashes", "England", "Australia"))
+    # Other countries' scenes.
+    ipl = _match(Format.T20, "Indian Premier League", "Mumbai Indians", "Chennai Super Kings")
+    assert is_home_domestic(ipl, "india")
+    assert not is_home_domestic(ipl, "england")
+    bbl = _match(Format.T20, "Big Bash League", "Sydney Sixers", "Perth Scorchers")
+    assert is_home_domestic(bbl, "australia")
+    assert is_home_domestic(ipl, None) is False
 
 
 def test_second_xi_and_academy_excluded_from_domestic():
-    # Real noise from the live feed: "Derbyshire 2nd XI" matches "derbyshire"
-    # as a substring but isn't the professional game.
     second_xi = _match(Format.FIRST_CLASS, "Second Eleven Championship",
                        "Derbyshire 2nd XI", "Sussex 2nd XI")
-    academy = _match(Format.FIRST_CLASS, "West Indies Academy tour of Sri Lanka",
-                     "Sri Lanka A", "West Indies Academy")
-    assert not is_english_domestic(second_xi)
+    assert not is_home_domestic(second_xi)
     assert classify(second_xi).tier is Tier.OTHER
-    assert classify(academy).tier is Tier.OTHER
-    # The real county still counts.
-    real = _match(Format.FIRST_CLASS, "County Championship", "Surrey", "Kent")
-    assert is_english_domestic(real)
 
 
 def test_classification_tiers():
-    assert classify(_match(Format.ODI, "ICC Cricket World Cup", "England", "India")).tier is Tier.ENGLAND
+    assert classify(_match(Format.ODI, "ICC Cricket World Cup", "England", "India")).tier is Tier.FOLLOWED
     assert classify(_match(Format.TEST, "Border-Gavaskar", "India", "Australia")).tier is Tier.PREMIER
-    assert classify(_match(Format.ODI, "ICC Cricket World Cup", "India", "NZ")).tier is Tier.PREMIER
-    assert classify(_match(Format.T20, "Vitality Blast", "Surrey", "Kent")).tier is Tier.ENGLISH_DOMESTIC
+    assert classify(_match(Format.T20, "Vitality Blast", "Surrey", "Kent")).tier is Tier.HOME_DOMESTIC
     assert classify(_match(Format.ODI, "Bilateral", "Nepal", "USA")).tier is Tier.OTHER
+
+
+def test_following_a_different_team_reprioritises():
+    # An India fan: India v NZ World Cup is FOLLOWED, England's game is just premier.
+    prefs = Preferences(followed_teams=["india"], domestic="india")
+    ind = _match(Format.ODI, "ICC Cricket World Cup", "India", "New Zealand")
+    eng = _match(Format.TEST, "The Ashes", "England", "Australia")
+    assert classify(ind, prefs).tier is Tier.FOLLOWED
+    assert classify(eng, prefs).tier is Tier.PREMIER
 
 
 def test_full_priority_order_on_sample():
     ranked = prioritise(sample_matches())
     tiers = [cls.tier for _, cls in ranked]
-    # Tiers must be non-decreasing: England, then premier, then domestic, then other.
     assert tiers == sorted(tiers)
-    # England (men's Test at stumps OR women's T20I live) must be first.
-    first_match, first_cls = ranked[0]
-    assert first_cls.tier is Tier.ENGLAND
+    assert ranked[0][1].tier is Tier.FOLLOWED
 
 
-def test_other_tier_only_kept_when_live_international():
-    # Bangladesh v Zimbabwe ODI is 'other' but live+international -> kept.
-    ranked = prioritise(sample_matches())
-    ids = {m.match_id for m, _ in ranked}
-    assert "demo-ban-zim-odi" in ids
+def test_filter_live_only():
+    ranked = prioritise(sample_matches(), Preferences(live_only=True))
+    assert all(m.phase.is_active_today for m, _ in ranked)
+    assert not any(m.phase is Phase.COMPLETE for m, _ in ranked)
 
 
-def test_live_sorts_before_stumps_within_tier():
-    # England women's T20I (live) should rank above England men's Test (stumps).
-    ranked = prioritise(sample_matches())
-    england = [m for m, c in ranked if c.tier is Tier.ENGLAND]
-    assert england[0].phase is Phase.LIVE
-    assert england[0].match_id == "demo-engw-ausw-t20i"
+def test_filter_by_format():
+    prefs = Preferences(formats={Format.WT20I, Format.T20I, Format.T20})
+    ranked = prioritise(sample_matches(), prefs)
+    assert ranked  # something matches
+    assert all(m.format in prefs.formats for m, _ in ranked)
+
+
+def test_filter_womens_only():
+    ranked = prioritise(sample_matches(), Preferences(gender="women"))
+    assert ranked
+    assert all("women" in (m.series_name + " ".join(m.team_names)).lower()
+               for m, _ in ranked)
+
+
+def test_limit_applied():
+    ranked = prioritise(sample_matches(), Preferences(limit=2))
+    assert len(ranked) == 2

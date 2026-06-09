@@ -226,7 +226,7 @@ class EspnSource(DataSource):
             match.recent_balls = self._recent_balls(match.match_id)
         return match
 
-    def _recent_balls(self, event_id: str, limit: int = 6) -> list[Ball]:
+    def _recent_balls(self, event_id: str, limit: int = 10) -> list[Ball]:
         """Most recent deliveries (newest first). Commentary paginates
         oldest-first, so we read page 1 for the page count, then the last page."""
         try:

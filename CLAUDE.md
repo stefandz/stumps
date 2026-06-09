@@ -67,13 +67,20 @@ sources/* ── Match objects ──> prioritise ──> render
     here — not upstream. Format comes from `class.internationalClassId`
     (+ `generalClassCard`); phase from `fullStatus.type.state`.
 
-- **`prioritise.py`** is the *policy*. `classify(match) -> Classification`
-  assigns a `Tier` (ENGLAND/PREMIER/ENGLISH_DOMESTIC/OTHER); `prioritise()`
-  filters + sorts (tier, then live-before-stumps-before-finished, then format).
-  Classification depends on the allow-lists in `config.py` because **no feed has
-  a clean flag** for "top-tier Test" / "World Cup" / "English county" — those are
-  matched by team-name and series-name against the lists. Tuning what shows up =
-  editing `config.py` lists, not the logic.
+- **`options.py`** holds `Preferences` — the user-facing choices (followed
+  teams, region, domestic scene, filters, display toggles, JSON) resolved from
+  `~/.config/stumps/config.toml` overlaid with CLI flags (`Preferences.resolve`).
+  Threaded through `prioritise()` and the renderers. `config.Settings` stays
+  infra-only (keys, cache, http, `region`).
+
+- **`prioritise.py`** is the *policy*. `classify(match, prefs) -> Classification`
+  assigns a `Tier` (FOLLOWED/PREMIER/HOME_DOMESTIC/OTHER); `prioritise(matches,
+  prefs)` filters (formats, gender, phase, series, tier floor, limit) + sorts
+  (tier, then live-before-stumps-before-finished, then format). Classification
+  depends on the allow-lists in `config.py` because **no feed has a clean flag**
+  for "top-tier Test" / "World Cup" / "county" — matched by team/series name.
+  "Home domestic" is generalised via `config.DOMESTIC_SCENES` (england/india/
+  australia). Tuning what shows up = editing `config.py` lists, not the logic.
 
 - **`dls/`** — Standard Edition par scores. `table.py` loads the verified
   resource grid from `data/dls_standard_resources.csv` (rows = overs remaining,
@@ -94,10 +101,13 @@ sources/* ── Match objects ──> prioritise ──> render
   for Tests. The trained model only covers **limited-overs second-innings
   chases** — that's the clean, well-defined case.
 
-- **`render/console.py`** — all rich output. It *computes* the DLS par and win
-  estimate per match (calling `dls`/`winprob`) rather than expecting them on the
-  model. `cli.py` parses args and orchestrates fetch → prioritise → enrich(top N
-  only, to respect rate limits) → render.
+- **`render/console.py`** — all rich output; honours `Preferences` toggles
+  (`--compact`, `--no-figures/-winprob/-dls/-commentary`, `--plain`). It
+  *computes* the DLS par and win estimate per match (calling `dls`/`winprob`)
+  rather than expecting them on the model. **`render/json_out.py`** is the
+  `--json` path (stable schema for scripts/widgets). `cli.py` parses args, builds
+  `Preferences`, and orchestrates fetch → prioritise → enrich(active matches
+  only, to respect rate limits) → render (console or JSON).
 
 ## Conventions / gotchas
 

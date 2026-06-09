@@ -152,6 +152,41 @@ ENGLISH_DOMESTIC_SERIES_MARKERS: tuple[str, ...] = (
     "charlotte edwards cup",
 )
 
+
+@dataclass(frozen=True)
+class DomesticScene:
+    """A country's domestic cricket: team-name fragments + series-name markers
+    used to recognise its professional domestic game (any format)."""
+
+    teams: frozenset[str]
+    series_markers: tuple[str, ...]
+
+
+#: Home-domestic scenes by country key (see --domestic). England reuses the
+#: detailed allow-lists above; India and Australia are good starting sets.
+DOMESTIC_SCENES: dict[str, DomesticScene] = {
+    "england": DomesticScene(ENGLISH_DOMESTIC_TEAMS, ENGLISH_DOMESTIC_SERIES_MARKERS),
+    "india": DomesticScene(
+        frozenset({
+            "super kings", "mumbai indians", "royal challengers", "knight riders",
+            "delhi capitals", "sunrisers", "rajasthan royals", "punjab kings",
+            "gujarat titans", "lucknow super giants",
+        }),
+        (
+            "indian premier league", "ipl", "ranji trophy", "syed mushtaq ali",
+            "vijay hazare", "duleep trophy", "irani", "women's premier league",
+        ),
+    ),
+    "australia": DomesticScene(
+        frozenset({
+            "sixers", "thunder", "stars", "renegades", "heat", "scorchers",
+            "strikers", "hurricanes", "new south wales", "victoria", "queensland",
+            "western australia", "south australia", "tasmania",
+        }),
+        ("sheffield shield", "big bash", "bbl", "wbbl", "marsh cup", "marsh one-day cup"),
+    ),
+}
+
 # --------------------------------------------------------------------------
 # Source constants
 # --------------------------------------------------------------------------
@@ -235,12 +270,22 @@ class Settings:
     winprob_model_path: Path = field(
         default_factory=lambda: _default_cache_dir() / "winprob_model.pkl"
     )
+    #: ESPN scoreboard region (gb, in, au, …) — affects coverage emphasis.
+    region: str = "gb"
 
     def __post_init__(self) -> None:
         self.cache_dir = Path(self.cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
 
+def load_config_file() -> dict:
+    """Public accessor for the parsed config.toml (used for preference defaults)."""
+    return _load_config_file()
+
+
 def load_settings() -> Settings:
     config_file = _load_config_file()
-    return Settings(cricketdata_api_key=_resolve_api_key(config_file))
+    return Settings(
+        cricketdata_api_key=_resolve_api_key(config_file),
+        region=os.environ.get("STUMPS_REGION") or config_file.get("region") or "gb",
+    )

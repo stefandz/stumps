@@ -1,11 +1,15 @@
 """Command-line entry point for ``stumps``.
 
-  stumps                 # prioritised cricket: England first, then big
-                         #   Tests/ICC, then English domestic
-  stumps --all           # include every match, not just ones of interest
-  stumps --demo          # use built-in sample data (offline)
-  stumps --refresh 30    # live-refresh every 30 seconds
-  stumps train           # train the win-probability model from Cricsheet
+  stumps                      # prioritised cricket for your team(s)
+  stumps --team india         # follow India instead of the England default
+  stumps --region in --domestic india
+  stumps --live-only --format t20    # filter what's shown
+  stumps --compact            # one line per match
+  stumps --json               # machine-readable output
+  stumps --refresh 30         # live-refresh every 30 seconds
+  stumps train                # train the win-probability model from Cricsheet
+
+Defaults (team, region, domestic) can be set in ~/.config/stumps/config.toml.
 """
 
 from __future__ import annotations
@@ -17,9 +21,11 @@ from datetime import datetime
 
 from rich.console import Console
 
-from stumps.config import load_settings
+from stumps.config import load_config_file, load_settings
+from stumps.options import Preferences
 from stumps.prioritise import prioritise
 from stumps.render import render_report
+from stumps.render.json_out import render_json
 from stumps.sources.aggregator import Aggregator
 from stumps.sources.base import SourceError
 
@@ -27,20 +33,58 @@ from stumps.sources.base import SourceError
 def _show_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stumps",
-        description="Prioritised cricket scores for England fans.",
+        description="Prioritised cricket scores for the team(s) you follow.",
     )
-    p.add_argument("--all", action="store_true",
+
+    a = p.add_argument_group("who/what to follow")
+    a.add_argument("--team", "--follow", action="append", metavar="NAME",
+                   help="team to put first (repeatable). Default: England")
+    a.add_argument("--no-team", action="store_true",
+                   help="don't prioritise any team (rank by tournament/domestic only)")
+    a.add_argument("--region", metavar="CODE",
+                   help="ESPN scoreboard region: gb, in, au, … (default gb)")
+    a.add_argument("--domestic", metavar="COUNTRY",
+                   help="home domestic scene: england, india, australia, or none")
+
+    b = p.add_argument_group("filtering")
+    b.add_argument("--all", action="store_true",
                    help="show every match, not just ones of interest")
-    p.add_argument("--demo", action="store_true",
-                   help="use built-in sample data (offline)")
-    p.add_argument("--limit", type=int, default=None,
+    b.add_argument("--tier", choices=["followed", "premier", "domestic", "all"],
+                   help="lowest relevance tier to include (default domestic)")
+    b.add_argument("--format", action="append", choices=["test", "odi", "t20", "hundred"],
+                   help="restrict to format(s) (repeatable)")
+    b.add_argument("--live-only", action="store_true",
+                   help="only matches in play (live / break / stumps)")
+    b.add_argument("--no-finished", action="store_true", help="hide finished matches")
+    b.add_argument("--no-upcoming", action="store_true", help="hide upcoming matches")
+    gender = b.add_mutually_exclusive_group()
+    gender.add_argument("--mens-only", action="store_true")
+    gender.add_argument("--womens-only", action="store_true")
+    b.add_argument("--series", metavar="TEXT", help="only series whose name contains TEXT")
+    b.add_argument("--include-warmups", action="store_true",
+                   help="treat World Cup warm-ups/qualifiers as premier")
+    b.add_argument("--limit", type=int, default=None,
                    help="cap the number of matches shown")
-    p.add_argument("--no-enrich", action="store_true",
+
+    c = p.add_argument_group("display")
+    c.add_argument("--compact", action="store_true", help="one line per match")
+    c.add_argument("--no-figures", action="store_true", help="hide batting/bowling")
+    c.add_argument("--no-winprob", action="store_true", help="hide win probability")
+    c.add_argument("--no-dls", action="store_true", help="hide DLS par")
+    c.add_argument("--no-commentary", action="store_true", help="hide recent balls")
+    c.add_argument("--balls", type=int, default=None, metavar="N",
+                   help="how many recent balls to show (default 6)")
+    c.add_argument("--plain", action="store_true", help="disable colour")
+
+    o = p.add_argument_group("output / data")
+    o.add_argument("--json", action="store_true", help="machine-readable JSON output")
+    o.add_argument("--demo", action="store_true",
+                   help="use built-in sample data (offline)")
+    o.add_argument("--no-enrich", action="store_true",
                    help="skip fetching detailed batting/bowling figures")
-    p.add_argument("--refresh", type=int, metavar="SECONDS", default=None,
+    o.add_argument("--refresh", type=int, metavar="SECONDS", default=None,
                    help="redraw every SECONDS until interrupted")
-    p.add_argument("--width", type=int, default=None,
-                   help="force console width")
+    o.add_argument("--width", type=int, default=None, help="force console width")
     return p
 
 
@@ -62,31 +106,36 @@ def _train_parser() -> argparse.ArgumentParser:
 
 
 def _run_show(args: argparse.Namespace) -> int:
+    prefs = Preferences.resolve(args, load_config_file())
     settings = load_settings()
-    console = Console(width=args.width)
+    settings.region = prefs.region
+    console = Console(width=args.width, no_color=args.plain)
     agg = Aggregator(settings, demo_only=args.demo)
 
     def run_once() -> None:
         result = agg.fetch()
-        ranked = prioritise(result.matches, include_all=args.all)
-        if args.limit is not None:
-            ranked = ranked[: args.limit]
+        ranked = prioritise(result.matches, prefs)
         if not args.no_enrich:
             # Only fetch detailed scorecards for matches we'll show figures for
             # (live / break / stumps). Finished and upcoming games don't need
             # them, which also conserves the cricketdata.org daily quota.
             agg.enrich(result, [m for m, _ in ranked if m.phase.is_active_today])
         when = datetime.now().strftime("%a %d %b %Y, %H:%M")
-        render_report(console, result, ranked, settings, when=when)
+        if prefs.json_output:
+            print(render_json(result, ranked, settings, prefs, when=when))
+        else:
+            render_report(console, result, ranked, settings, prefs, when=when)
 
     if args.refresh:
         try:
             while True:
-                console.clear()
+                if not prefs.json_output:
+                    console.clear()
                 run_once()
-                console.print(
-                    f"\n[dim]refreshing every {args.refresh}s — Ctrl-C to quit[/dim]"
-                )
+                if not prefs.json_output:
+                    console.print(
+                        f"\n[dim]refreshing every {args.refresh}s — Ctrl-C to quit[/dim]"
+                    )
                 time.sleep(args.refresh)
         except KeyboardInterrupt:
             console.print("\n[dim]bye 👋[/dim]")

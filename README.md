@@ -1,13 +1,14 @@
 # 🏏 stumps
 
 A command-line companion for cricket lovers. Run it and see the cricket you care
-about, prioritised the way an England fan thinks about it:
+about, prioritised around the team(s) you follow (England by default, any team
+via `--team`):
 
-1. **England first** — men's or women's, any format, always.
+1. **Your team first** — men's or women's, any format, always.
 2. Then **top-tier Test matches** (two ICC full members) and **premier ICC
    tournaments** (World Cup, T20 World Cup, Champions Trophy, WTC final).
-3. Then **English domestic** cricket — County Championship, One-Day Cup, Vitality
-   Blast, The Hundred, women's regional competitions.
+3. Then your **home domestic** cricket — England's counties by default; India or
+   Australia via `--domestic`.
 4. Everything else last (and only if it's a live international).
 
 For each match you get the live score, a synthesised headline ("India need 71
@@ -46,13 +47,35 @@ pip install -e '.[winprob,dev]'      # winprob = numpy + scikit-learn for the mo
 ## Usage
 
 ```bash
-stumps                  # the prioritised report
+stumps                  # the prioritised report (England by default)
+stumps --team india     # follow India instead (repeatable: --team eng --team aus)
+stumps --region in --domestic india   # tune coverage + your home domestic scene
+stumps --compact        # one line per match
+stumps --json           # machine-readable output (status bars, widgets, scripts)
+stumps --live-only --format t20       # filter what's shown
+stumps --womens-only    # or --mens-only
 stumps --all            # include every match, not just ones of interest
-stumps --demo           # built-in sample data (offline; great for a quick look)
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
-stumps --limit 5        # cap how many matches are shown
+stumps --demo           # built-in sample data (offline; great for a quick look)
 stumps train            # train the win-probability model from Cricsheet
 ```
+
+`stumps --help` lists every flag, grouped into *follow*, *filtering*, *display*,
+and *output*.
+
+### Make it yours
+
+Set your defaults once in `~/.config/stumps/config.toml` so you don't repeat
+flags every run:
+
+```toml
+team = ["India", "Mumbai Indians"]   # who to put first
+region = "in"                         # ESPN coverage region
+domestic = "india"                    # home domestic scene (england/india/australia/none)
+cricketdata_api_key = "…"            # optional fallback-source key
+```
+
+CLI flags always override the config file.
 
 ## Data sources
 

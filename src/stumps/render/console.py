@@ -15,6 +15,7 @@ from rich.text import Text
 from stumps import dls
 from stumps.dls.par import G50_ASSOCIATE_OR_WOMENS_ODI, G50_FULL_MEMBER
 from stumps.models import Format, Match, Phase
+from stumps.options import Preferences
 from stumps.prioritise import Classification, Tier
 from stumps.sources.aggregator import FetchResult
 from stumps.winprob import estimate, extract_chase_state
@@ -31,9 +32,9 @@ _PHASE_STYLE = {
 }
 
 _TIER_ACCENT = {
-    Tier.ENGLAND: "bright_cyan",
+    Tier.FOLLOWED: "bright_cyan",
     Tier.PREMIER: "magenta",
-    Tier.ENGLISH_DOMESTIC: "green",
+    Tier.HOME_DOMESTIC: "green",
     Tier.OTHER: "white",
 }
 
@@ -161,11 +162,11 @@ def _headline(match: Match) -> str:
     return match.status_text
 
 
-def _recent_balls_block(match: Match) -> Group | None:
+def _recent_balls_block(match: Match, limit: int = 6) -> Group | None:
     if not match.recent_balls:
         return None
     rows: list = [Text("Recent", style="bold dim")]
-    for b in match.recent_balls:
+    for b in match.recent_balls[:limit]:
         line = Text()
         line.append(f"{b.over:>5}  ", style="dim")
         if b.is_wicket:
@@ -235,7 +236,29 @@ def _winprob_block(est: WinEstimate, accent: str) -> Group:
     return Group(*rows)
 
 
-def _match_panel(match: Match, cls: Classification, settings) -> Panel:
+def _compact_line(match: Match, cls: Classification) -> Text:
+    """One-line-per-match summary for --compact."""
+    accent = _TIER_ACCENT.get(cls.tier, "white")
+    label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
+    line = Text()
+    line.append(f"{label:<11}", style=style)
+    line.append("  ")
+    line.append(match.title, style=f"bold {accent}")
+    scores = "  ".join(
+        f"{i.batting_team.split()[0] if i.batting_team else '?'} {i.score}"
+        for i in match.innings
+    )
+    if scores:
+        line.append(f"  {scores}")
+    headline = _headline(match)
+    if headline and headline.strip().lower() not in {"live", "stumps"}:
+        line.append(f"  — {headline}", style="dim")
+    return line
+
+
+def _match_panel(
+    match: Match, cls: Classification, settings, prefs: Preferences
+) -> Panel:
     accent = _TIER_ACCENT.get(cls.tier, "white")
     body: list = []
 
@@ -252,28 +275,32 @@ def _match_panel(match: Match, cls: Classification, settings) -> Panel:
     # In-play indicators (figures, DLS par, win probability) only make sense
     # while a match is active — live, at a break, or paused at stumps. For a
     # finished match the result is already on the status line, and showing a
-    # win % for a settled game is just noise.
+    # win % for a settled game is just noise. Each is individually toggleable.
     if match.phase.is_active_today:
-        inns = match.current_innings
-        if inns is not None:
-            bat = _batting_table(inns)
-            bowl = _bowling_table(inns)
-            if bat is not None:
-                body.append(bat)
-            if bowl is not None:
-                body.append(bowl)
+        if prefs.show_figures:
+            inns = match.current_innings
+            if inns is not None:
+                bat = _batting_table(inns)
+                bowl = _bowling_table(inns)
+                if bat is not None:
+                    body.append(bat)
+                if bowl is not None:
+                    body.append(bowl)
 
-        dls_line = _dls_line(match)
-        if dls_line is not None:
-            body.append(dls_line)
+        if prefs.show_dls:
+            dls_line = _dls_line(match)
+            if dls_line is not None:
+                body.append(dls_line)
 
-        recent = _recent_balls_block(match)
-        if recent is not None:
-            body.append(recent)
+        if prefs.show_commentary:
+            recent = _recent_balls_block(match, prefs.balls)
+            if recent is not None:
+                body.append(recent)
 
-        est = estimate(match, settings)
-        if est is not None:
-            body.append(_winprob_block(est, accent))
+        if prefs.show_winprob:
+            est = estimate(match, settings)
+            if est is not None:
+                body.append(_winprob_block(est, accent))
 
     title = Text()
     title.append(_phase_badge(match))
@@ -296,10 +323,12 @@ def render_report(
     result: FetchResult,
     ranked: list[tuple[Match, Classification]],
     settings,
+    prefs: Preferences | None = None,
     *,
     when: str = "",
 ) -> None:
     """Render the full prioritised report."""
+    prefs = prefs or Preferences()
     header = Text()
     header.append("🏏 stumps", style="bold bright_cyan")
     if when:
@@ -319,4 +348,7 @@ def render_report(
         return
 
     for match, cls in ranked:
-        console.print(_match_panel(match, cls, settings))
+        if prefs.compact:
+            console.print(_compact_line(match, cls))
+        else:
+            console.print(_match_panel(match, cls, settings, prefs))
