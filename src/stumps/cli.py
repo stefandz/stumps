@@ -37,6 +37,16 @@ def _show_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stumps",
         description="Prioritised cricket scores for the team(s) you follow.",
+        epilog=(
+            "--team matches any team name (case-insensitive substring), so "
+            "'england' also catches England Women/Lions. --domestic supports "
+            "every ICC full member (england, india, australia, pakistan, "
+            "south-africa, new-zealand, sri-lanka, bangladesh, west-indies, "
+            "afghanistan, ireland, zimbabwe) plus aliases (sa, nz, windies, …). "
+            "The README's 'Teams & domestic scenes' section lists good strings "
+            "for each, and --team/--region/--domestic support tab-completion "
+            '(eval "$(register-python-argcomplete stumps)").'
+        ),
     )
 
     a = p.add_argument_group("who/what to follow")

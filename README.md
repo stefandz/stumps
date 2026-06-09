@@ -101,6 +101,43 @@ eval "$(register-python-argcomplete stumps)"   # add to ~/.bashrc or ~/.zshrc
 Then `stumps --team Aus<TAB>` → `Australia`, `stumps --region <TAB>` lists region
 codes, etc.
 
+### Teams & domestic scenes you can follow
+
+`--team` does a case-insensitive substring match, so the simplest string wins:
+`--team england` also catches *England Women*, *England Lions*, *England A*.
+
+**International** — every ICC full member:
+
+```
+afghanistan  australia  bangladesh  england  india  ireland
+new zealand  pakistan   south africa  sri lanka  west indies  zimbabwe
+```
+
+Associate nations work by name too (e.g. `scotland`, `netherlands`, `nepal`,
+`namibia`, `usa`, `uae`, `oman`, `papua new guinea`).
+
+**Domestic scenes** (`--domestic <key>`, aliases in brackets) — a few example
+`--team` strings from each:
+
+| Scene | Example team strings |
+|---|---|
+| `england` (`uk`) | Surrey · Lancashire · Oval Invincibles · Birmingham Phoenix |
+| `india` (`ind`) | Mumbai Indians · Delhi Capitals · Punjab Kings · Gujarat Titans |
+| `australia` (`aus`) | Sixers · Scorchers · Hurricanes · New South Wales |
+| `pakistan` (`pak`) | Karachi Kings · Lahore Qalandars · Multan Sultans · Peshawar Zalmi |
+| `south-africa` (`sa`) | MI Cape Town · Paarl Royals · Pretoria Capitals · Dolphins |
+| `new-zealand` (`nz`) | Auckland · Canterbury · Otago · Wellington Firebirds |
+| `sri-lanka` (`sl`) | Jaffna Kings · Galle · Colombo Strikers · Kandy Falcons |
+| `bangladesh` (`ban`) | Comilla Victorians · Rangpur Riders · Fortune Barishal · Khulna Tigers |
+| `west-indies` (`wi`, `windies`) | Trinbago Knight Riders · Guyana Amazon Warriors · Barbados Royals · Jamaica Tallawahs |
+| `afghanistan` (`afg`) | Band-e-Amir · Mis Ainak · Amo Sharks · Boost Defenders |
+| `ireland` (`ire`) | Leinster Lightning · Northern Knights · Munster Reds · North-West Warriors |
+| `zimbabwe` (`zim`) | Mountaineers · Mid West Rhinos · Matabeleland Tuskers · Mashonaland Eagles |
+
+The domestic scene also matches its competitions by name (IPL, Big Bash, PSL,
+SA20, CPL, County Championship, …), so you'll see those even for teams not listed
+above.
+
 ## Data sources
 
 Live data uses, with automatic fallback:
