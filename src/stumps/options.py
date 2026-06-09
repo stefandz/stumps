@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from stumps.config import resolve_domestic_key
 from stumps.models import Format
 
 #: Format-category keywords (for --format) -> the concrete Formats they cover.
@@ -65,7 +66,7 @@ class Preferences:
             prefs.followed_teams = [t] if isinstance(t, str) else list(t)
         prefs.region = config.get("region", prefs.region)
         if "domestic" in config:
-            prefs.domestic = config["domestic"] or None
+            prefs.domestic = resolve_domestic_key(config["domestic"])
 
         # CLI overrides
         if getattr(args, "team", None):
@@ -77,7 +78,7 @@ class Preferences:
         if getattr(args, "region", None):
             prefs.region = args.region
         if getattr(args, "domestic", None) is not None:
-            prefs.domestic = None if args.domestic.lower() == "none" else args.domestic.lower()
+            prefs.domestic = resolve_domestic_key(args.domestic)
 
         if getattr(args, "format", None):
             wanted: set[Format] = set()

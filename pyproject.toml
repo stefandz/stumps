@@ -11,6 +11,8 @@ dependencies = [
     # Python TLS handshakes (403); curl_cffi reproduces Chrome's, which gets the
     # free ESPN open API through. This is the whole reason live data works.
     "curl_cffi>=0.7",
+    # Shell tab-completion for --team/--region (register-python-argcomplete).
+    "argcomplete>=3.0",
 ]
 
 [project.optional-dependencies]

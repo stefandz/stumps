@@ -11,6 +11,7 @@
 
 Defaults (team, region, domestic) can be set in ~/.config/stumps/config.toml.
 """
+# PYTHON_ARGCOMPLETE_OK
 
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from datetime import datetime
 
 from rich.console import Console
 
+from stumps import completion
 from stumps.config import load_config_file, load_settings
 from stumps.options import Preferences
 from stumps.prioritise import prioritise
@@ -37,14 +39,16 @@ def _show_parser() -> argparse.ArgumentParser:
     )
 
     a = p.add_argument_group("who/what to follow")
-    a.add_argument("--team", "--follow", action="append", metavar="NAME",
-                   help="team to put first (repeatable). Default: England")
+    team_action = a.add_argument("--team", "--follow", action="append", metavar="NAME",
+                                 help="team to put first (repeatable). Default: England")
     a.add_argument("--no-team", action="store_true",
                    help="don't prioritise any team (rank by tournament/domestic only)")
-    a.add_argument("--region", metavar="CODE",
-                   help="ESPN scoreboard region: gb, in, au, … (default gb)")
-    a.add_argument("--domestic", metavar="COUNTRY",
-                   help="home domestic scene: england, india, australia, or none")
+    region_action = a.add_argument("--region", metavar="CODE",
+                                   help="ESPN scoreboard region: gb, in, au, … (default gb)")
+    domestic_action = a.add_argument("--domestic", metavar="COUNTRY",
+                   help="home domestic scene: any full member (e.g. india, "
+                        "south-africa), or none")
+    completion.attach(team_action, region_action, domestic_action)
 
     b = p.add_argument_group("filtering")
     b.add_argument("--all", action="store_true",
@@ -201,7 +205,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv and argv[0] == "train":
         return _run_train(_train_parser().parse_args(argv[1:]))
 
-    args = _show_parser().parse_args(argv)
+    parser = _show_parser()
+    completion.autocomplete(parser)  # tab-completion hook (no-op without argcomplete)
+    args = parser.parse_args(argv)
     try:
         return _run_show(args)
     except SourceError as exc:

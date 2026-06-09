@@ -71,11 +71,27 @@ flags every run:
 ```toml
 team = ["India", "Mumbai Indians"]   # who to put first
 region = "in"                         # ESPN coverage region
-domestic = "india"                    # home domestic scene (england/india/australia/none)
+domestic = "india"                    # home domestic scene (any full member, or none)
 cricketdata_api_key = "…"            # optional fallback-source key
 ```
 
 CLI flags always override the config file.
+
+`--domestic` understands every ICC full member — `england`, `india`,
+`australia`, `pakistan`, `south-africa`, `new-zealand`, `sri-lanka`,
+`bangladesh`, `west-indies`, `afghanistan`, `ireland`, `zimbabwe` — plus short
+aliases (`sa`, `nz`, `windies`, …) and `none`.
+
+### Shell tab-completion
+
+`--team` and `--region` (and `--domestic`) support tab-completion. Enable it once:
+
+```bash
+eval "$(register-python-argcomplete stumps)"   # add to ~/.bashrc or ~/.zshrc
+```
+
+Then `stumps --team Aus<TAB>` → `Australia`, `stumps --region <TAB>` lists region
+codes, etc.
 
 ## Data sources
 

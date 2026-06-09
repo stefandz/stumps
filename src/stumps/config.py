@@ -162,8 +162,9 @@ class DomesticScene:
     series_markers: tuple[str, ...]
 
 
-#: Home-domestic scenes by country key (see --domestic). England reuses the
-#: detailed allow-lists above; India and Australia are good starting sets.
+#: Home-domestic scenes for every ICC full member, keyed by a CLI-friendly token
+#: (multi-word nations are hyphenated; see --domestic). Detection uses team-name
+#: fragments and series-name markers — series markers are the robust signal.
 DOMESTIC_SCENES: dict[str, DomesticScene] = {
     "england": DomesticScene(ENGLISH_DOMESTIC_TEAMS, ENGLISH_DOMESTIC_SERIES_MARKERS),
     "india": DomesticScene(
@@ -185,7 +186,109 @@ DOMESTIC_SCENES: dict[str, DomesticScene] = {
         }),
         ("sheffield shield", "big bash", "bbl", "wbbl", "marsh cup", "marsh one-day cup"),
     ),
+    "pakistan": DomesticScene(
+        frozenset({
+            "karachi kings", "lahore qalandars", "islamabad united", "peshawar zalmi",
+            "multan sultans", "quetta gladiators",
+        }),
+        (
+            "pakistan super league", "psl", "quaid-e-azam", "national t20",
+            "president's", "pakistan cup", "champions one-day cup", "champions t20",
+        ),
+    ),
+    "south-africa": DomesticScene(
+        frozenset({
+            "mi cape town", "sunrisers eastern cape", "pretoria capitals",
+            "joburg super kings", "super giants", "paarl royals",
+            "dolphins", "cobras",
+        }),
+        ("sa20", "csa 4-day", "csa one-day", "csa t20", "4-day series", "betway sa20"),
+    ),
+    "new-zealand": DomesticScene(
+        frozenset({
+            "auckland", "canterbury", "central districts", "central stags",
+            "northern districts", "northern brave", "otago", "otago volts",
+            "wellington", "wellington firebirds", "canterbury kings", "auckland aces",
+        }),
+        ("plunket shield", "super smash", "ford trophy"),
+    ),
+    "sri-lanka": DomesticScene(
+        frozenset({
+            "colombo strikers", "galle", "jaffna kings", "dambulla", "kandy falcons",
+            "b-love kandy",
+        }),
+        ("lanka premier league", "lpl", "major league", "national super league",
+         "premier league tournament", "invitation tournament"),
+    ),
+    "bangladesh": DomesticScene(
+        frozenset({
+            "comilla victorians", "rangpur riders", "khulna tigers",
+            "chattogram challengers", "sylhet strikers", "fortune barishal",
+            "durdanto dhaka", "dhaka capitals",
+        }),
+        ("bangladesh premier league", "bpl", "national cricket league",
+         "dhaka premier", "bangladesh cricket league"),
+    ),
+    "west-indies": DomesticScene(
+        frozenset({
+            "trinbago knight riders", "guyana amazon warriors", "barbados royals",
+            "st kitts", "saint lucia", "st lucia kings", "jamaica tallawahs",
+            "antigua", "leeward islands", "windward islands", "trinidad", "guyana",
+        }),
+        ("caribbean premier league", "cpl", "west indies championship", "super50",
+         "regional 4-day", "headley"),
+    ),
+    "afghanistan": DomesticScene(
+        frozenset({
+            "band-e-amir", "mis ainak", "speen ghar", "amo sharks", "pamir legends",
+            "hindukush strikers", "boost defenders",
+        }),
+        ("shpageeza", "ahmad shah abdali", "ghazi amanullah"),
+    ),
+    "ireland": DomesticScene(
+        frozenset({
+            "leinster lightning", "northern knights", "munster reds",
+            "north-west warriors", "north west warriors",
+        }),
+        ("inter-provincial", "interprovincial"),
+    ),
+    "zimbabwe": DomesticScene(
+        frozenset({
+            "mountaineers", "mid west rhinos", "rhinos", "southern rocks",
+            "matabeleland tuskers", "tuskers", "mashonaland eagles", "eagles",
+        }),
+        ("logan cup", "pro50", "domestic twenty20"),
+    ),
 }
+
+#: Aliases so common short forms / spaced names resolve to a scene key.
+DOMESTIC_ALIASES: dict[str, str] = {
+    "sa": "south-africa",
+    "rsa": "south-africa",
+    "nz": "new-zealand",
+    "wi": "west-indies",
+    "windies": "west-indies",
+    "sl": "sri-lanka",
+    "uk": "england",
+    "eng": "england",
+    "aus": "australia",
+    "ind": "india",
+    "pak": "pakistan",
+    "ban": "bangladesh",
+    "ire": "ireland",
+    "afg": "afghanistan",
+    "zim": "zimbabwe",
+}
+
+
+def resolve_domestic_key(value: str | None) -> str | None:
+    """Normalise a --domestic / config value to a DOMESTIC_SCENES key (or None)."""
+    if not value:
+        return None
+    key = value.strip().lower().replace(" ", "-")
+    if key in {"none", "off", ""}:
+        return None
+    return DOMESTIC_ALIASES.get(key, key)
 
 # --------------------------------------------------------------------------
 # Source constants

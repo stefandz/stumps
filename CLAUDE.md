@@ -71,7 +71,11 @@ sources/* ── Match objects ──> prioritise ──> render
   teams, region, domestic scene, filters, display toggles, JSON) resolved from
   `~/.config/stumps/config.toml` overlaid with CLI flags (`Preferences.resolve`).
   Threaded through `prioritise()` and the renderers. `config.Settings` stays
-  infra-only (keys, cache, http, `region`).
+  infra-only (keys, cache, http, `region`). `--domestic` values pass through
+  `config.resolve_domestic_key` (handles aliases/spaces → scene key), so don't
+  use argparse `choices` for it. `completion.py` provides argcomplete-backed tab
+  completion for `--team`/`--region`/`--domestic` (optional; no-op if argcomplete
+  is absent). All 12 full members have a `config.DOMESTIC_SCENES` entry.
 
 - **`prioritise.py`** is the *policy*. `classify(match, prefs) -> Classification`
   assigns a `Tier` (FOLLOWED/PREMIER/HOME_DOMESTIC/OTHER); `prioritise(matches,
