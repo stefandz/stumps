@@ -1,0 +1,37 @@
+[project]
+name = "stumps"
+version = "0.1.0"
+description = "A CLI for cricket lovers: prioritised live scores, batting/bowling figures, DLS par scores and a home-grown win-probability indicator."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+# Needed to train the win-probability model from Cricsheet. Inference at runtime
+# falls back to a pure-Python heuristic when these (and a trained model) are absent.
+winprob = [
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+stumps = "stumps.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stumps = ["data/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
