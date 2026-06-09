@@ -7,6 +7,7 @@
   stumps --compact            # one line per match
   stumps --json               # machine-readable output
   stumps --refresh 30         # live-refresh every 30 seconds
+  stumps config               # interactive setup of your defaults
   stumps train                # train the win-probability model from Cricsheet
 
 Defaults (team, region, domestic) can be set in ~/.config/stumps/config.toml.
@@ -149,6 +150,94 @@ def _run_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _config_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="stumps config",
+        description="Set up ~/.config/stumps/config.toml (interactive by default).",
+    )
+    p.add_argument("--show", action="store_true", help="print current config and exit")
+    p.add_argument("--team", "--follow", action="append", metavar="NAME",
+                   help="set followed team(s) non-interactively (repeatable)")
+    p.add_argument("--region", metavar="CODE", help="set region non-interactively")
+    p.add_argument("--domestic", metavar="COUNTRY", help="set domestic scene")
+    p.add_argument("--cricketdata-api-key", metavar="KEY",
+                   help="set the cricketdata.org fallback key")
+    return p
+
+
+def _run_config(args: argparse.Namespace) -> int:
+    from stumps import config as cfg
+
+    console = Console()
+    existing = cfg.load_config_file()
+    path = cfg.config_file_path()
+
+    if args.show:
+        if existing:
+            console.print(f"[dim]{path}[/dim]\n")
+            console.print(cfg.dump_toml(existing).rstrip())
+        else:
+            console.print(f"[dim]No config yet at {path}[/dim]")
+        return 0
+
+    data = dict(existing)
+    non_interactive = any([args.team, args.region, args.domestic,
+                           args.cricketdata_api_key])
+
+    if non_interactive:
+        if args.team:
+            data["team"] = args.team if len(args.team) > 1 else args.team[0]
+        if args.region:
+            data["region"] = args.region
+        if args.domestic:
+            data["domestic"] = cfg.resolve_domestic_key(args.domestic) or "none"
+        if args.cricketdata_api_key:
+            data["cricketdata_api_key"] = args.cricketdata_api_key
+    else:
+        data = _config_wizard(console, existing)
+
+    saved = cfg.save_config_file(data)
+    console.print(f"[green]✓[/green] saved [bold]{saved}[/bold]")
+    return 0
+
+
+def _config_wizard(console: Console, existing: dict) -> dict:
+    from rich.prompt import Prompt
+
+    from stumps.completion import REGIONS, domestic_keys
+    from stumps.config import resolve_domestic_key
+
+    console.print("[bold bright_cyan]🏏 stumps config[/bold bright_cyan]  "
+                  "[dim](press Enter to keep the shown default)[/dim]\n")
+
+    cur_team = existing.get("team")
+    team_default = ", ".join(cur_team) if isinstance(cur_team, list) else (cur_team or "England")
+    teams = [t.strip() for t in Prompt.ask(
+        "Team(s) to follow [dim](comma-separated)[/dim]", default=team_default).split(",")
+        if t.strip()]
+
+    console.print(f"[dim]regions: {', '.join(REGIONS)}[/dim]")
+    region = Prompt.ask("Region code", default=existing.get("region", "gb")).strip().lower()
+
+    console.print(f"[dim]domestic: {', '.join(domestic_keys())}[/dim]")
+    domestic_in = Prompt.ask(
+        "Home domestic scene", default=str(existing.get("domestic", "england")))
+    domestic = resolve_domestic_key(domestic_in) or "none"
+
+    has_key = bool(existing.get("cricketdata_api_key"))
+    key_prompt = "cricketdata.org API key " + (
+        "[dim](Enter to keep existing)[/dim]" if has_key else "[dim](optional, Enter to skip)[/dim]")
+    key_in = Prompt.ask(key_prompt, default="", show_default=False).strip()
+
+    data = dict(existing)
+    data["team"] = teams if len(teams) > 1 else (teams[0] if teams else "England")
+    data["region"] = region
+    data["domestic"] = domestic
+    if key_in:
+        data["cricketdata_api_key"] = key_in
+    return data
+
+
 def _run_train(args: argparse.Namespace) -> int:
     from stumps.config import load_settings as _ls
 
@@ -204,6 +293,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if argv and argv[0] == "train":
         return _run_train(_train_parser().parse_args(argv[1:]))
+
+    if argv and argv[0] == "config":
+        return _run_config(_config_parser().parse_args(argv[1:]))
 
     parser = _show_parser()
     completion.autocomplete(parser)  # tab-completion hook (no-op without argcomplete)

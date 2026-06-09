@@ -65,8 +65,16 @@ and *output*.
 
 ### Make it yours
 
-Set your defaults once in `~/.config/stumps/config.toml` so you don't repeat
-flags every run:
+Set your defaults once so you don't repeat flags every run. The easiest way is
+the interactive helper:
+
+```bash
+stumps config            # wizard: team(s), region, domestic, API key
+stumps config --show     # print current config
+stumps config --team India --region in --domestic india   # set non-interactively
+```
+
+It writes `~/.config/stumps/config.toml` (chmod 600, since it may hold your key):
 
 ```toml
 team = ["India", "Mumbai Indians"]   # who to put first

@@ -381,9 +381,46 @@ class Settings:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
 
+def config_file_path() -> Path:
+    return _config_dir() / "config.toml"
+
+
 def load_config_file() -> dict:
     """Public accessor for the parsed config.toml (used for preference defaults)."""
     return _load_config_file()
+
+
+def _toml_value(value) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+    text = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{text}"'
+
+
+def dump_toml(data: dict) -> str:
+    """Serialise a flat dict of str/bool/number/list values to TOML."""
+    lines = ["# stumps configuration — edit by hand or run `stumps config`", ""]
+    for key, value in data.items():
+        if value is None:
+            continue
+        lines.append(f"{key} = {_toml_value(value)}")
+    return "\n".join(lines) + "\n"
+
+
+def save_config_file(data: dict) -> Path:
+    """Write config.toml (chmod 600, since it may hold an API key)."""
+    path = config_file_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(dump_toml(data), encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+    return path
 
 
 def load_settings() -> Settings:
