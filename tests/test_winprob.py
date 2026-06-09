@@ -53,6 +53,21 @@ def test_no_chase_state_for_first_innings():
     assert extract_chase_state(m) is None
 
 
+def test_chase_target_inferred_when_feed_omits_it():
+    # Live feeds (cricketdata/Cricinfo summaries) don't include a target; it
+    # must be inferred as first-innings total + 1.
+    m = Match("x", Format.ODI, [Team("A"), Team("B")], phase=Phase.LIVE,
+              innings=[
+                  Innings("A", "B", 1, 250, 10, 50.0, all_out=True, closed=True),
+                  Innings("B", "A", 2, 120, 3, 25.0),  # no target set
+              ])
+    state = extract_chase_state(m)
+    assert state is not None
+    assert state.target == 251  # 250 + 1
+    assert state.runs == 120
+    assert state.chasing_team == "B"
+
+
 # -- heuristic --------------------------------------------------------------
 
 

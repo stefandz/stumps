@@ -91,30 +91,30 @@ def feature_vector(state: ChaseState) -> list[float]:
 
 
 def extract_chase_state(match: Match) -> ChaseState | None:
-    """Pull a :class:`ChaseState` from a live limited-overs chase, or None."""
+    """Pull a :class:`ChaseState` from a limited-overs second-innings chase.
+
+    Returns None during the first innings (no target yet). Limited-overs games
+    have exactly two innings, so the chase is the second one; its target is
+    inferred as the first-innings total + 1 when the live feed omits it (the
+    summary endpoints usually do).
+    """
     if not match.format.is_limited_overs:
         return None
     overs = match.format.overs_per_innings
     if not overs:
         return None
+    if len(match.innings) < 2:
+        return None  # still the first innings — not a chase
 
-    # The chasing innings is the in-progress one carrying a target.
-    chasing = None
-    for inns in match.innings:
-        if inns.target and not inns.closed:
-            chasing = inns
-            break
-    if chasing is None:
-        # Fall back to the last innings if it has a target (e.g. just finished).
-        last = match.current_innings
-        if last and last.target:
-            chasing = last
-    if chasing is None:
+    first = match.innings[0]
+    chasing = match.innings[-1]
+    target = chasing.target or (first.runs + 1)
+    if target <= 0:
         return None
 
     return ChaseState(
         is_t20=match.format in {Format.T20I, Format.WT20I, Format.T20},
-        target=chasing.target,
+        target=target,
         runs=chasing.runs,
         wickets_lost=chasing.wickets,
         balls_bowled=overs_to_balls(chasing.overs),

@@ -66,16 +66,29 @@ def _scores_line(match: Match) -> Text:
     return txt
 
 
+def _figures_table(section: str) -> Table:
+    """A figures table whose header row doubles as the column legend, with the
+    section name ('Batting'/'Bowling') sitting over the player-name column."""
+    t = Table(
+        box=None,
+        show_header=True,
+        header_style="bold dim",
+        padding=(0, 2),
+        pad_edge=False,
+    )
+    t.add_column(section, style="white")
+    return t
+
+
 def _batting_table(inns) -> Table | None:
     active = [b for b in inns.batters if b.not_out] or inns.batters[:2]
     if not active:
         return None
-    t = Table.grid(padding=(0, 2))
-    t.add_column("Batter", style="white")
-    t.add_column("R", justify="right")
-    t.add_column("B", justify="right")
+    t = _figures_table("Batting")
+    t.add_column("R", justify="right")  # runs
+    t.add_column("B", justify="right")  # balls faced
     t.add_column("4s/6s", justify="right")
-    t.add_column("SR", justify="right")
+    t.add_column("SR", justify="right")  # strike rate
     for b in active:
         name = Text(b.name + (" *" if b.on_strike else ""),
                     style="bold" if b.on_strike else "")
@@ -88,13 +101,12 @@ def _bowling_table(inns) -> Table | None:
     bowlers = [b for b in inns.bowlers if b.bowling_now] or inns.bowlers[:2]
     if not bowlers:
         return None
-    t = Table.grid(padding=(0, 2))
-    t.add_column("Bowler", style="white")
-    t.add_column("O", justify="right")
-    t.add_column("M", justify="right")
-    t.add_column("R", justify="right")
-    t.add_column("W", justify="right")
-    t.add_column("Econ", justify="right")
+    t = _figures_table("Bowling")
+    t.add_column("O", justify="right")  # overs
+    t.add_column("M", justify="right")  # maidens
+    t.add_column("R", justify="right")  # runs conceded
+    t.add_column("W", justify="right")  # wickets
+    t.add_column("Econ", justify="right")  # economy rate
     for b in bowlers:
         name = Text(b.name + (" →" if b.bowling_now else ""),
                     style="bold" if b.bowling_now else "")
@@ -170,24 +182,24 @@ def _match_panel(match: Match, cls: Classification, settings) -> Panel:
 
     body.append(_scores_line(match))
 
-    # Live figures only when there's play to show.
+    # In-play indicators (figures, DLS par, win probability) only make sense
+    # while a match is active — live, at a break, or paused at stumps. For a
+    # finished match the result is already on the status line, and showing a
+    # win % for a settled game is just noise.
     if match.phase.is_active_today:
         inns = match.current_innings
         if inns is not None:
             bat = _batting_table(inns)
             bowl = _bowling_table(inns)
             if bat is not None:
-                body.append(Text("Batting", style="dim"))
                 body.append(bat)
             if bowl is not None:
-                body.append(Text("Bowling", style="dim"))
                 body.append(bowl)
 
-    dls_line = _dls_line(match)
-    if dls_line is not None:
-        body.append(dls_line)
+        dls_line = _dls_line(match)
+        if dls_line is not None:
+            body.append(dls_line)
 
-    if match.phase is not Phase.UPCOMING:
         est = estimate(match, settings)
         if est is not None:
             body.append(_winprob_block(est, accent))

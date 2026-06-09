@@ -155,6 +155,40 @@ def _default_cache_dir() -> Path:
     return Path(base) / "stumps"
 
 
+def _config_dir() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return Path(base) / "stumps"
+
+
+def _load_config_file() -> dict:
+    """Read ``~/.config/stumps/config.toml`` if present (else empty).
+
+    A handy, git-safe place to keep your cricketdata.org key:
+
+        # ~/.config/stumps/config.toml
+        cricketdata_api_key = "your-key-here"
+
+    Environment variables still take precedence over this file.
+    """
+    path = _config_dir() / "config.toml"
+    if not path.exists():
+        return {}
+    try:
+        import tomllib  # Python 3.11+
+
+        with path.open("rb") as fh:
+            return tomllib.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def _resolve_api_key(config_file: dict) -> str | None:
+    # Precedence: environment variable, then config file.
+    return os.environ.get("CRICKETDATA_API_KEY") or config_file.get(
+        "cricketdata_api_key"
+    )
+
+
 @dataclass
 class Settings:
     """Resolved runtime configuration, mostly from environment variables."""
@@ -178,4 +212,5 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    return Settings()
+    config_file = _load_config_file()
+    return Settings(cricketdata_api_key=_resolve_api_key(config_file))
