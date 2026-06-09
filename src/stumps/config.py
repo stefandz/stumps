@@ -64,12 +64,27 @@ ASSOCIATE_NATIONS: frozenset[str] = frozenset(
 ALL_NATIONS: frozenset[str] = TOP_TIER_TEST_NATIONS | ASSOCIATE_NATIONS
 
 #: Substrings (case-insensitive) in a *series* name that mark a premier ICC
-#: international tournament. Kept broad on purpose; refine if it over-matches.
+#: international tournament — the actual events, not the build-up.
 ICC_TOURNAMENT_MARKERS: tuple[str, ...] = (
     "world cup",
     "champions trophy",
     "world test championship",
     "wtc final",
+)
+
+#: Substrings that disqualify an otherwise-matching series from being "premier":
+#: warm-ups and the multi-year qualifier pathways are World-Cup-*named* but are
+#: not the tournament itself, so they shouldn't outrank English domestic cricket.
+ICC_TOURNAMENT_EXCLUSIONS: tuple[str, ...] = (
+    "warm-up",
+    "warm up",
+    "warmup",
+    "league two",
+    "league 2",
+    "qualifier",
+    "challenge league",
+    "sub regional",
+    "sub-regional",
 )
 
 #: The 18 first-class counties plus the men's/women's regional competitions, used

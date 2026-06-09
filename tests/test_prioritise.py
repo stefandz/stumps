@@ -40,7 +40,32 @@ def test_top_tier_test_requires_two_full_members():
 def test_icc_tournament_by_series_name():
     assert is_icc_tournament(_match(Format.ODI, "ICC Cricket World Cup 2027", "A", "B"))
     assert is_icc_tournament(_match(Format.T20I, "ICC Men's T20 World Cup", "A", "B"))
+    assert is_icc_tournament(_match(Format.ODI, "ICC Champions Trophy 2025", "A", "B"))
     assert not is_icc_tournament(_match(Format.ODI, "Bilateral ODI Series", "A", "B"))
+
+
+def test_icc_warmups_and_qualifiers_are_not_premier():
+    # Real series names from a live run — World-Cup-named but not the event.
+    warmup = _match(Format.WT20I,
+                    "ICC Womens T20 World Cup Warm-up Matches 2026", "A", "B")
+    league2 = _match(Format.ODI,
+                     "ICC Cricket World Cup League Two 2023-27", "Canada", "USA")
+    assert not is_icc_tournament(warmup)
+    assert not is_icc_tournament(league2)
+    assert classify(warmup).tier is Tier.OTHER
+    assert classify(league2).tier is Tier.OTHER
+
+
+def test_finished_warmup_is_filtered_but_live_one_is_kept():
+    live_warmup = _match(Format.WT20I, "ICC Womens T20 World Cup Warm-up Matches",
+                         "Ireland Women", "Bangladesh Women", phase=Phase.LIVE)
+    done_warmup = _match(Format.WT20I, "ICC Womens T20 World Cup Warm-up Matches",
+                         "New Zealand Women", "Bangladesh Women", phase=Phase.COMPLETE)
+    ranked = prioritise([live_warmup, done_warmup])
+    ids = [m.series_name for m, _ in ranked]
+    # The live international warm-up still shows; the finished one is dropped.
+    assert live_warmup in [m for m, _ in ranked]
+    assert done_warmup not in [m for m, _ in ranked]
 
 
 def test_english_domestic_by_team_and_series():

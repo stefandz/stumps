@@ -67,6 +67,8 @@ def is_top_tier_test(match: Match) -> bool:
 
 def is_icc_tournament(match: Match) -> bool:
     series = match.series_name.lower()
+    if any(excl in series for excl in config.ICC_TOURNAMENT_EXCLUSIONS):
+        return False  # warm-up / qualifier / League Two — not the event itself
     return any(marker in series for marker in config.ICC_TOURNAMENT_MARKERS)
 
 
