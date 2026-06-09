@@ -53,6 +53,68 @@ def test_cricketdata_is_international(settings):
     assert not src._is_international(["Surrey", "Kent"])
 
 
+def test_cricketdata_enrich_preserves_summary_totals(settings):
+    # Reproduces the real bug: cricapi scorecard objects carry batting/bowling
+    # but NO totals (those are in the separate 'score' array). enrich() must
+    # merge figures WITHOUT zeroing the summary's runs/wickets/overs.
+    src = CricketDataSource(settings)
+    raw_summary = {
+        "id": "m1",
+        "name": "England Women vs Australia Women",
+        "matchType": "t20",
+        "status": "England Women need 50 runs in 30 balls",
+        "matchStarted": True,
+        "matchEnded": False,
+        "teams": ["England Women", "Australia Women"],
+        "score": [
+            {"r": 165, "w": 6, "o": 20.0, "inning": "Australia Women Inning 1"},
+            {"r": 116, "w": 3, "o": 15.0, "inning": "England Women Inning 1"},
+        ],
+    }
+    match = src._normalise(raw_summary)
+    assert [(i.runs, i.wickets) for i in match.innings] == [(165, 6), (116, 3)]
+
+    scorecard_payload = {
+        "data": {
+            "score": raw_summary["score"],
+            "scorecard": [
+                {"inning": "Australia Women Inning 1", "batting": [], "bowling": []},
+                {
+                    "inning": "England Women Inning 1",
+                    "batting": [{"batsman": {"name": "N Sciver-Brunt"}, "r": 44,
+                                 "b": 31, "4s": 5, "6s": 1, "dismissal-text": "batting"}],
+                    "bowling": [{"bowler": {"name": "A Gardner"}, "o": 3, "m": 0,
+                                 "r": 19, "w": 1}],
+                },
+            ],
+        }
+    }
+    src._get = lambda endpoint, params: scorecard_payload  # type: ignore[assignment]
+    src.enrich(match)
+    # Totals preserved...
+    assert [(i.runs, i.wickets) for i in match.innings] == [(165, 6), (116, 3)]
+    # ...and figures merged in.
+    assert match.innings[1].batters[0].name == "N Sciver-Brunt"
+    assert match.innings[1].bowlers[0].wickets == 1
+
+
+def test_cricketdata_normalises_mangled_team_labels(settings):
+    src = CricketDataSource(settings)
+    raw = {
+        "id": "m2", "name": "Sri Lanka Women vs Pakistan Women", "matchType": "t20",
+        "status": "Sri Lanka Women won", "matchStarted": True, "matchEnded": True,
+        "teams": ["Sri Lanka Women", "Pakistan Women"],
+        "score": [
+            {"r": 150, "w": 4, "o": 20.0, "inning": "sri lanka women Inning 1"},
+            {"r": 120, "w": 9, "o": 20.0, "inning": "Sri Lanka Women,Pakistan Women Inning 1"},
+        ],
+    }
+    match = src._normalise(raw)
+    # Lower-cased and comma-mangled labels resolve to canonical team names.
+    assert match.innings[0].batting_team == "Sri Lanka Women"
+    assert match.innings[1].batting_team == "Pakistan Women"
+
+
 def test_cricketdata_requires_key(settings):
     src = CricketDataSource(settings)
     assert not src.available

@@ -72,7 +72,10 @@ def _run_show(args: argparse.Namespace) -> int:
         if args.limit is not None:
             ranked = ranked[: args.limit]
         if not args.no_enrich:
-            agg.enrich(result, [m for m, _ in ranked])
+            # Only fetch detailed scorecards for matches we'll show figures for
+            # (live / break / stumps). Finished and upcoming games don't need
+            # them, which also conserves the cricketdata.org daily quota.
+            agg.enrich(result, [m for m, _ in ranked if m.phase.is_active_today])
         when = datetime.now().strftime("%a %d %b %Y, %H:%M")
         render_report(console, result, ranked, settings, when=when)
 
