@@ -146,6 +146,7 @@ def _dls_line(match: Match) -> Text | None:
 
 def _winprob_bar(label: str, prob: float, accent: str, width: int = 24) -> Text:
     filled = int(round(prob * width))
+    label = (label[:16] + "…") if len(label) > 17 else label
     bar = Text()
     bar.append(f"{label:<18}", style="white")
     bar.append("█" * filled, style=accent)
@@ -176,8 +177,10 @@ def _match_panel(match: Match, cls: Classification, settings) -> Panel:
     accent = _TIER_ACCENT.get(cls.tier, "white")
     body: list = []
 
-    # Status headline
-    if match.status_text:
+    # Status headline — skip bare state words (the phase badge already says it).
+    if match.status_text and match.status_text.strip().lower() not in {
+        "live", "stumps", "tea", "lunch", "drinks", "close", "close of play",
+    }:
         body.append(Text(match.status_text, style="bold"))
 
     body.append(_scores_line(match))

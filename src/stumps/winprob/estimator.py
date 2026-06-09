@@ -201,6 +201,10 @@ def estimate(match: Match, settings: Settings | None = None) -> WinEstimate | No
     """Best available win-probability estimate for a match, or None."""
     settings = settings or load_settings()
 
+    # No scoring data yet -> nothing meaningful to estimate from.
+    if not any(i.runs > 0 for i in match.innings):
+        return None
+
     chase = extract_chase_state(match)
     if chase is not None:
         chasing = chase.chasing_team or "Chasing"

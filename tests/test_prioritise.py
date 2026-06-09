@@ -75,6 +75,21 @@ def test_english_domestic_by_team_and_series():
     assert not is_english_domestic(_match(Format.TEST, "The Ashes", "England", "Australia"))
 
 
+def test_second_xi_and_academy_excluded_from_domestic():
+    # Real noise from the live feed: "Derbyshire 2nd XI" matches "derbyshire"
+    # as a substring but isn't the professional game.
+    second_xi = _match(Format.FIRST_CLASS, "Second Eleven Championship",
+                       "Derbyshire 2nd XI", "Sussex 2nd XI")
+    academy = _match(Format.FIRST_CLASS, "West Indies Academy tour of Sri Lanka",
+                     "Sri Lanka A", "West Indies Academy")
+    assert not is_english_domestic(second_xi)
+    assert classify(second_xi).tier is Tier.OTHER
+    assert classify(academy).tier is Tier.OTHER
+    # The real county still counts.
+    real = _match(Format.FIRST_CLASS, "County Championship", "Surrey", "Kent")
+    assert is_english_domestic(real)
+
+
 def test_classification_tiers():
     assert classify(_match(Format.ODI, "ICC Cricket World Cup", "England", "India")).tier is Tier.ENGLAND
     assert classify(_match(Format.TEST, "Border-Gavaskar", "India", "Australia")).tier is Tier.PREMIER

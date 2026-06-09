@@ -72,8 +72,16 @@ def is_icc_tournament(match: Match) -> bool:
     return any(marker in series for marker in config.ICC_TOURNAMENT_MARKERS)
 
 
+def is_minor_cricket(match: Match) -> bool:
+    """Second XI, academy, age-group cricket — not the professional game."""
+    haystack = (match.series_name.lower(), *_lower_names(match))
+    return any(
+        marker in field for field in haystack for marker in config.MINOR_CRICKET_MARKERS
+    )
+
+
 def is_english_domestic(match: Match) -> bool:
-    if match.format.is_international:
+    if match.format.is_international or is_minor_cricket(match):
         return False
     names = _lower_names(match)
     series = match.series_name.lower()

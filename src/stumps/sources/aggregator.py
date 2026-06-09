@@ -12,7 +12,7 @@ from stumps.config import Settings
 from stumps.models import Match
 from stumps.sources.base import DataSource, SourceError
 from stumps.sources.cricketdata import CricketDataSource
-from stumps.sources.cricinfo import CricinfoSource
+from stumps.sources.espn import EspnSource
 from stumps.sources.fixtures import DemoSource
 
 
@@ -31,7 +31,7 @@ class Aggregator:
             self.sources: list[DataSource] = [DemoSource(settings)]
         else:
             self.sources = [
-                CricinfoSource(settings),
+                EspnSource(settings),
                 CricketDataSource(settings),
             ]
         self._demo = DemoSource(settings)

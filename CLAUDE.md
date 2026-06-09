@@ -50,14 +50,22 @@ sources/* ── Match objects ──> prioritise ──> render
 
 - **`sources/`** — one module per data source, all implementing
   `DataSource.fetch_current_matches() -> list[Match]` and an optional
-  `enrich(match)` (fetch a detailed scorecard for matches we'll actually show).
-  `aggregator.py` tries Cricinfo → cricketdata.org → demo data, in order,
-  returning a `FetchResult`. `fixtures.py` is the offline `DemoSource` and the
-  single source of sample data for `--demo` and tests.
+  `enrich(match)` (fetch detailed figures for matches we'll actually show).
+  `aggregator.py` tries ESPN → cricketdata.org → demo data, in order, returning a
+  `FetchResult`. `fixtures.py` is the offline `DemoSource` and the single source
+  of sample data for `--demo` and tests.
+  - **`espn.py` is the primary source.** It uses ESPN's open API via `curl_cffi`
+    with Chrome TLS impersonation — this is *load-bearing*: ESPNcricinfo's CDN
+    403s plain Python TLS, and the old `hs-consumer-api` 403s even with
+    impersonation, so don't try to "simplify" back to httpx/that endpoint. The
+    list comes from the scoreboard header; figures + structured innings
+    (`linescores` with target) come from the per-event `summary` endpoint, used
+    only to `enrich()` active matches.
   - **The live JSON shapes are reverse-engineered and unstable.** Every field
-    access in `cricinfo.py`/`cricketdata.py` is defensive (`_dig`, `.get`) and
-    degrades to partial data. When a live run returns empty/odd data, the fix is
-    almost always in a `_normalise_*` helper there — not upstream.
+    access is defensive (`_dig`, `.get`) and degrades to partial data. When a
+    live run returns empty/odd data, the fix is almost always in a normaliser
+    here — not upstream. Format comes from `class.internationalClassId`
+    (+ `generalClassCard`); phase from `fullStatus.type.state`.
 
 - **`prioritise.py`** is the *policy*. `classify(match) -> Classification`
   assigns a `Tier` (ENGLAND/PREMIER/ENGLISH_DOMESTIC/OTHER); `prioritise()`

@@ -6,8 +6,8 @@ from stumps.config import Settings
 from stumps.models import Format, Phase
 from stumps.sources.aggregator import Aggregator
 from stumps.sources.base import SourceError
-from stumps.sources.cricinfo import CricinfoSource, _parse_score
 from stumps.sources.cricketdata import CricketDataSource
+from stumps.sources.espn import EspnSource, parse_score
 from stumps.sources.fixtures import DemoSource
 
 
@@ -22,14 +22,17 @@ def settings(tmp_path):
 @pytest.mark.parametrize(
     "score,expected",
     [
-        ("180/4", (180, 4, False, False)),
-        ("250/8d", (250, 8, True, False)),
-        ("425", (425, 10, False, True)),
-        ("312/10", (312, 10, False, False)),
+        # runs, wkts, overs, target, declared, all_out
+        ("180/4", (180, 4, 0.0, 0, False, False)),
+        ("250/8d", (250, 8, 0.0, 0, True, False)),
+        ("425", (425, 10, 0.0, 0, False, True)),
+        ("174/6 (49.2 ov)", (174, 6, 49.2, 0, False, False)),
+        ("191/9 (42.2/50 ov, target 285)", (191, 9, 42.2, 285, False, False)),
+        ("421 & 50/2", (50, 2, 0.0, 0, False, False)),  # multi-day: current seg
     ],
 )
 def test_parse_score(score, expected):
-    assert _parse_score(score) == expected
+    assert parse_score(score) == expected
 
 
 # -- cricketdata format detection ------------------------------------------
@@ -122,41 +125,76 @@ def test_cricketdata_requires_key(settings):
         src.fetch_current_matches()
 
 
-# -- cricinfo normaliser ----------------------------------------------------
+# -- ESPN normaliser (real scoreboard / summary shapes) ---------------------
 
 
-def test_cricinfo_normalise_summary(settings):
-    src = CricinfoSource(settings)
-    raw = {
-        "objectId": 12345,
-        "series": {"objectId": 999, "name": "ICC Cricket World Cup 2027"},
-        "internationalClassId": 2,  # ODI
-        "statusText": "India need 71 runs",
-        "state": "LIVE",
-        "ground": {"name": "Eden Gardens"},
-        "teams": [
-            {"team": {"objectId": 1, "longName": "India", "abbreviation": "IND"},
-             "score": "210/4"},
-            {"team": {"objectId": 2, "longName": "New Zealand", "abbreviation": "NZ"},
-             "score": "280/8"},
+def _espn_event():
+    return {
+        "id": "1532480",
+        "name": "Bangladesh v Australia",
+        "summary": "Live",
+        "eventType": "ODI",
+        "location": "Dhaka",
+        "class": {"internationalClassId": "2", "generalClassCard": "ODI",
+                  "eventType": "ODI"},
+        "fullStatus": {"type": {"state": "in", "detail": "Live"}},
+        "competitors": [
+            {"team": {"displayName": "Bangladesh", "abbreviation": "BAN", "id": "1"},
+             "score": "284/8"},
+            {"team": {"displayName": "Australia", "abbreviation": "AUS", "id": "2"},
+             "score": "191/9 (42.2/50 ov, target 285)"},
         ],
     }
-    match = src._normalise_summary(raw)
-    assert match.match_id == "12345"
-    assert match.series_id == "999"
+
+
+def test_espn_event_to_match(settings):
+    src = EspnSource(settings)
+    match = src._event_to_match(_espn_event(), "24324", "Australia tour of Bangladesh")
+    assert match.match_id == "1532480"
+    assert match.series_id == "24324"
     assert match.format is Format.ODI
     assert match.phase is Phase.LIVE
-    assert match.team_names == ["India", "New Zealand"]
-    assert match.venue == "Eden Gardens"
-    assert len(match.innings) == 2
-    assert match.innings[0].runs == 210 and match.innings[0].wickets == 4
+    assert match.team_names == ["Bangladesh", "Australia"]
+    assert match.venue == "Dhaka"
+    assert match.innings[0].runs == 284 and match.innings[0].wickets == 8
+    assert match.innings[1].runs == 191 and match.innings[1].target == 285
 
 
-def test_cricinfo_phase_detects_stumps_and_breaks(settings):
-    src = CricinfoSource(settings)
-    assert src._phase({"state": "LIVE", "statusText": "Stumps, Day 2"}) is Phase.STUMPS
-    assert src._phase({"state": "LIVE", "statusText": "Tea Break"}) is Phase.BREAK
-    assert src._phase({"state": "POST", "statusText": "India won by 5 wickets"}) is Phase.COMPLETE
+def test_espn_format_from_class():
+    src = EspnSource(Settings(cricketdata_api_key=None))
+    assert src._format({"internationalClassId": "1"}, "Test") is Format.TEST
+    assert src._format({"internationalClassId": "10"}, "T20") is Format.WT20I
+    assert src._format({"internationalClassId": "0", "generalClassCard": "First-class"}, "Test") is Format.FIRST_CLASS
+    assert src._format({"internationalClassId": "0", "generalClassCard": "Twenty20"}, "T20") is Format.T20
+
+
+def test_espn_phase_from_status():
+    src = EspnSource(Settings(cricketdata_api_key=None))
+    assert src._phase({"fullStatus": {"type": {"state": "in"}}, "summary": "Stumps Day 2"}) is Phase.STUMPS
+    assert src._phase({"fullStatus": {"type": {"state": "post", "detail": "won"}}}) is Phase.COMPLETE
+    assert src._phase({"fullStatus": {"type": {"state": "pre"}}}) is Phase.UPCOMING
+
+
+def test_espn_innings_from_summary_linescores():
+    src = EspnSource(Settings(cricketdata_api_key=None))
+    summary = {
+        "header": {"competitions": [{"competitors": [
+            {"team": {"displayName": "Bangladesh"}, "score": "284/8", "linescores": [
+                {"period": 1, "runs": 284, "wickets": 8, "overs": 50.0,
+                 "isCurrent": 0, "statistics": {"categories": [{}]}}]},
+            {"team": {"displayName": "Australia"}, "score": "191/9 (target 285)",
+             "linescores": [
+                {"period": 1, "runs": 0, "wickets": 0, "overs": 50.0},
+                {"period": 2, "runs": 191, "wickets": 9, "overs": 42.2,
+                 "isCurrent": 1, "target": 285, "statistics": {"categories": [{}]}}]},
+        ]}]},
+        "rosters": [],
+    }
+    innings = src._innings_from_summary(summary)
+    assert [(i.batting_team, i.runs, i.number) for i in innings] == [
+        ("Bangladesh", 284, 1), ("Australia", 191, 2)]
+    assert innings[0].closed is True
+    assert innings[1].closed is False and innings[1].target == 285
 
 
 # -- aggregator fallback ----------------------------------------------------
@@ -165,7 +203,7 @@ def test_cricinfo_phase_detects_stumps_and_breaks(settings):
 def test_aggregator_falls_back_to_demo(settings, monkeypatch):
     # Force the live source to fail; no cricketdata key -> should land on demo.
     monkeypatch.setattr(
-        CricinfoSource, "fetch_current_matches",
+        EspnSource, "fetch_current_matches",
         lambda self: (_ for _ in ()).throw(SourceError("blocked")),
     )
     agg = Aggregator(settings)

@@ -124,6 +124,21 @@ ENGLISH_DOMESTIC_TEAMS: frozenset[str] = frozenset(
     }
 )
 
+#: Markers (in team OR series names) for second-string / age-group / academy
+#: cricket that we don't treat as the professional domestic game of interest.
+#: A match matching any of these drops out of the "English domestic" tier.
+MINOR_CRICKET_MARKERS: tuple[str, ...] = (
+    "2nd xi",
+    "second xi",
+    "second eleven",
+    "academy",
+    "u19",
+    "u-19",
+    "under-19",
+    "under 19",
+    "development",
+)
+
 #: Series-name markers for English domestic competitions (a secondary signal,
 #: since franchise/regional team names vary).
 ENGLISH_DOMESTIC_SERIES_MARKERS: tuple[str, ...] = (

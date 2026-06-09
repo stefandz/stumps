@@ -56,13 +56,17 @@ stumps train            # train the win-probability model from Cricsheet
 
 Live data uses, with automatic fallback:
 
-1. **ESPNcricinfo** (`hs-consumer-api`) — no key required, richest data. It sits
-   behind a CDN that can occasionally serve a challenge instead of JSON; if that
-   happens we fall back to…
-2. **cricketdata.org** (cricapi.com) — needs a free API key. Get one at
-   <https://cricketdata.org/signup.aspx> and set it:
-   ```bash
-   export CRICKETDATA_API_KEY=your-key-here
+1. **ESPN open cricket API** — no key required, richest data. ESPNcricinfo's CDN
+   blocks standard Python TLS handshakes (403), so we use `curl_cffi` to
+   impersonate Chrome's TLS fingerprint, which gets the free
+   `site.api.espn.com` scoreboard + per-match summary endpoints through (the
+   same approach as the [`cricdata`](https://github.com/arnavbonigala/cricdata)
+   project). No login, no key.
+2. **cricketdata.org** (cricapi.com) — fallback; needs a free API key. Get one at
+   <https://cricketdata.org/signup.aspx> and either set `CRICKETDATA_API_KEY` or
+   put it in `~/.config/stumps/config.toml`:
+   ```toml
+   cricketdata_api_key = "your-key-here"
    ```
 3. **Demo data** — if both live sources are unavailable, `stumps` shows built-in
    sample matches, clearly labelled, so you always see *something*.
