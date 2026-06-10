@@ -38,6 +38,13 @@ _TIER_ACCENT = {
     Tier.OTHER: "white",
 }
 
+#: Bare state labels that the phase badge already conveys — never worth showing
+#: as a headline (e.g. a finished game whose only status text is "Result").
+_GENERIC_STATUS = {
+    "live", "stumps", "tea", "lunch", "drinks", "close", "close of play",
+    "result", "stump",
+}
+
 
 def _phase_badge(match: Match) -> Text:
     label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
@@ -143,6 +150,35 @@ def _lead_trail(match: Match) -> str:
     return "Scores level"
 
 
+def _balls_to_overs(balls: int) -> str:
+    """Balls remaining -> cricket decimal-over notation (8 -> '1.2')."""
+    return f"{balls // 6}.{balls % 6}"
+
+
+def _final_innings_target(match: Match) -> tuple[str, int, int] | None:
+    """For a multi-day match in its final (4th) innings, the chasing team, the
+    runs they still need to win, and their wickets remaining. None if it's not
+    yet a fourth-innings chase or the target has already been overhauled."""
+    if not match.format.is_multi_day or len(match.innings) < 4:
+        return None
+    current = match.current_innings
+    if current is None:
+        return None
+    batting = current.batting_team
+
+    def total(team: str) -> int:
+        return sum(i.runs for i in match.innings if team.lower() in i.batting_team.lower())
+
+    others = [n for n in match.team_names if n.lower() not in batting.lower()]
+    if not others:
+        return None
+    to_win = total(others[0]) - total(batting) + 1
+    if to_win <= 0:
+        return None
+    wickets_remaining = max(0, 10 - current.wickets)
+    return batting, to_win, wickets_remaining
+
+
 def _headline(match: Match) -> str:
     """Best status line: a synthesised chase/lead phrase for active matches,
     else the source's own status (result, schedule, rain note...)."""
@@ -150,16 +186,71 @@ def _headline(match: Match) -> str:
         chase = extract_chase_state(match)
         if chase and chase.runs_needed > 0 and chase.balls_remaining > 0:
             runs = "run" if chase.runs_needed == 1 else "runs"
-            balls = "ball" if chase.balls_remaining == 1 else "balls"
+            # Overs are the natural unit, but in the final over every ball
+            # counts — switch to balls there, as live coverage does.
+            if chase.balls_remaining <= 6:
+                ball_word = "ball" if chase.balls_remaining == 1 else "balls"
+                span = f"{chase.balls_remaining} {ball_word}"
+            else:
+                span = f"{_balls_to_overs(chase.balls_remaining)} overs"
             return (
-                f"{chase.chasing_team} need {chase.runs_needed} {runs} "
-                f"from {chase.balls_remaining} {balls}"
+                f"{chase.chasing_team} require {chase.runs_needed} {runs} "
+                f"from {span}"
             )
         if match.format.is_multi_day:
+            target = _final_innings_target(match)
+            if target:
+                team, to_win, wkts = target
+                runs = "run" if to_win == 1 else "runs"
+                wkt_word = "wicket" if wkts == 1 else "wickets"
+                return (
+                    f"{team} require {to_win} {runs} to win "
+                    f"with {wkts} {wkt_word} remaining"
+                )
             line = _lead_trail(match)
             if line:
                 return line
+    elif match.phase is Phase.COMPLETE:
+        # The feed's result text is authoritative; only synthesise one when it
+        # gave us nothing usable (empty, or the bare label "Result").
+        if match.status_text.strip().lower() in _GENERIC_STATUS or not match.status_text.strip():
+            synth = _synth_result(match)
+            if synth:
+                return synth
     return match.status_text
+
+
+def _synth_result(match: Match) -> str | None:
+    """Best-effort result line for a finished limited-overs match when the feed
+    gave us no usable text. Deliberately conservative: only the unambiguous
+    chase case, where the second innings carries a target so we know who batted
+    when and can read off the margin. Skipped for multi-day games (a draw isn't
+    derivable from scores) and for D/L-affected games (the visible totals would
+    yield a wrong margin)."""
+    if not match.format.is_limited_overs or len(match.innings) < 2:
+        return None
+    blob = f"{match.status_text} {match.result_text}".lower()
+    if any(k in blob for k in ("dls", "d/l", "duckworth")):
+        return None
+    chase = next((i for i in match.innings if (i.target or 0) > 0), None)
+    if chase is None:
+        return None
+    target = chase.target
+    if chase.runs >= target:  # chase completed
+        wkts = max(0, 10 - chase.wickets)
+        unit = "wicket" if wkts == 1 else "wickets"
+        return f"{chase.batting_team} won by {wkts} {unit}"
+    if chase.runs == target - 1:  # scores level, chase over
+        return "Match tied"
+    defending = next(
+        (n for n in match.team_names if n.lower() != chase.batting_team.lower()),
+        None,
+    )
+    if defending is None:
+        return None
+    margin = (target - 1) - chase.runs
+    unit = "run" if margin == 1 else "runs"
+    return f"{defending} won by {margin} {unit}"
 
 
 def _recent_balls_block(match: Match, limit: int = 6) -> Group | None:
@@ -244,15 +335,18 @@ def _compact_line(match: Match, cls: Classification) -> Text:
     line.append(f"{label:<11}", style=style)
     line.append("  ")
     line.append(match.title, style=f"bold {accent}")
+    # Lead with the synthesised headline (the chase target / result) — it's the
+    # most useful bit, and compact lines are clipped to one row, so the verbose
+    # innings list trails where it can be truncated without losing the story.
+    headline = _headline(match)
+    if headline and headline.strip().lower() not in _GENERIC_STATUS:
+        line.append(f"  — {headline}", style="dim")
     scores = "  ".join(
         f"{i.batting_team.split()[0] if i.batting_team else '?'} {i.score}"
         for i in match.innings
     )
     if scores:
         line.append(f"  {scores}")
-    headline = _headline(match)
-    if headline and headline.strip().lower() not in {"live", "stumps"}:
-        line.append(f"  — {headline}", style="dim")
     return line
 
 
@@ -262,12 +356,10 @@ def _match_panel(
     accent = _TIER_ACCENT.get(cls.tier, "white")
     body: list = []
 
-    # Status headline — synthesised ("need 71 from 72", "trail by 245") where we
+    # Status headline — synthesised ("require 71 from 12.0 overs", "trail by 245") where we
     # can, else the source's. Skip bare state words (the badge already says it).
     headline = _headline(match)
-    if headline and headline.strip().lower() not in {
-        "live", "stumps", "tea", "lunch", "drinks", "close", "close of play",
-    }:
+    if headline and headline.strip().lower() not in _GENERIC_STATUS:
         body.append(Text(headline, style="bold"))
 
     body.append(_scores_line(match))
@@ -349,6 +441,7 @@ def render_report(
 
     for match, cls in ranked:
         if prefs.compact:
-            console.print(_compact_line(match, cls))
+            console.print(_compact_line(match, cls), no_wrap=True,
+                          overflow="ellipsis")
         else:
             console.print(_match_panel(match, cls, settings, prefs))

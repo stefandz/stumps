@@ -146,7 +146,13 @@ class EspnSource(DataSource):
             source=self.name,
         )
         if phase is Phase.COMPLETE:
-            match.result_text = status
+            # ESPN's scoreboard `summary` for a finished game is frequently the
+            # bare label "Result"; the human-readable outcome ("X won by N runs",
+            # "Match drawn", "Match tied") lives in fullStatus.type.detail.
+            detail = _dig(event, "fullStatus", "type", "detail") or ""
+            result = detail if detail.strip().lower() not in ("", "result") else status
+            match.result_text = result
+            match.status_text = result
         match.day_number, match.total_days = _parse_day(status)
         match.ball_by_ball_available = bool(event.get("playByPlayAvailable"))
         return match

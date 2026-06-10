@@ -175,6 +175,30 @@ def test_espn_phase_from_status():
     assert src._phase({"fullStatus": {"type": {"state": "pre"}}}) is Phase.UPCOMING
 
 
+def test_espn_completed_prefers_result_detail(settings):
+    # ESPN's `summary` for a finished game is often the bare label "Result";
+    # the real outcome lives in fullStatus.type.detail.
+    src = EspnSource(settings)
+    event = _espn_event()
+    event["summary"] = "Result"
+    event["fullStatus"] = {"type": {"state": "post",
+                                    "detail": "England Women won by 5 runs"}}
+    match = src._event_to_match(event, "1", "Series")
+    assert match.phase is Phase.COMPLETE
+    assert match.result_text == "England Women won by 5 runs"
+    assert match.status_text == "England Women won by 5 runs"
+
+
+def test_espn_completed_falls_back_to_summary(settings):
+    # If detail is absent, keep whatever summary we have rather than blanking it.
+    src = EspnSource(settings)
+    event = _espn_event()
+    event["summary"] = "South Africa won by 4 wickets"
+    event["fullStatus"] = {"type": {"state": "post"}}
+    match = src._event_to_match(event, "1", "Series")
+    assert match.result_text == "South Africa won by 4 wickets"
+
+
 def test_espn_innings_from_summary_linescores():
     src = EspnSource(Settings(cricketdata_api_key=None))
     summary = {

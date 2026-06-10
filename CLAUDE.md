@@ -65,7 +65,14 @@ sources/* ── Match objects ──> prioritise ──> render
     access is defensive (`_dig`, `.get`) and degrades to partial data. When a
     live run returns empty/odd data, the fix is almost always in a normaliser
     here — not upstream. Format comes from `class.internationalClassId`
-    (+ `generalClassCard`); phase from `fullStatus.type.state`.
+    (+ `generalClassCard`); phase from `fullStatus.type.state`. For a finished
+    game the result text comes from `fullStatus.type.detail` ("X won by N runs",
+    "Match drawn/tied"), *not* `summary` — which is often the bare label
+    "Result" (the renderer drops that via `_GENERIC_STATUS`). When the feed
+    leaves us nothing usable, `render.console._synth_result` reconstructs a
+    result *only* for the unambiguous limited-overs chase (the second innings
+    carries a `target`, so the margin is readable); it deliberately bails on
+    multi-day games (no draw signal) and D/L-affected ones (wrong margin).
 
 - **`options.py`** holds `Preferences` — the user-facing choices (followed
   teams, region, domestic scene, filters, display toggles, JSON) resolved from
@@ -108,7 +115,13 @@ sources/* ── Match objects ──> prioritise ──> render
 - **`render/console.py`** — all rich output; honours `Preferences` toggles
   (`--compact`, `--no-figures/-winprob/-dls/-commentary`, `--plain`). It
   *computes* the DLS par and win estimate per match (calling `dls`/`winprob`)
-  rather than expecting them on the model. **`render/json_out.py`** is the
+  rather than expecting them on the model. It also *synthesises* the status
+  headline (`_headline`): a limited-overs chase becomes "require N runs from
+  X.Y overs" (balls in the final over); a multi-day match in its fourth innings
+  becomes "require N runs to win with W wickets remaining"
+  (`_final_innings_target`), otherwise the lead/trail line; everything else falls
+  back to the source's own `status_text`. `--compact`
+  is one clipped line per match, leading with that headline. **`render/json_out.py`** is the
   `--json` path (stable schema for scripts/widgets). `cli.py` parses args, builds
   `Preferences`, and orchestrates fetch → prioritise → enrich(active matches
   only, to respect rate limits) → render (console or JSON).

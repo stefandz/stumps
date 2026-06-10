@@ -11,12 +11,16 @@ via `--team`):
    Australia via `--domestic`.
 4. Everything else last (and only if it's a live international).
 
-For each match you get the live score, a synthesised headline ("India need 71
-runs from 72 balls", "Hampshire trail by 221"), current **batting & bowling
-figures**, the **last few balls** of commentary (with wickets and boundaries
-flagged), a **DLS par score** in limited-overs games (a "are they ahead or
-behind?" indicator), end-of-day / stumps summaries for multi-day games, and a
-**win-probability estimate**.
+For each match you get the live score, a synthesised headline that frames the
+chase — "India require 71 runs from 12.0 overs" in limited-overs games (dropping
+to balls in the final over), "Hampshire require 304 runs to win with 8 wickets
+remaining" in the fourth innings of a Test or first-class match, "Hampshire
+trail by 221" earlier on, and the outcome ("England Women won by 5 runs", "Match
+drawn", "Match tied") once a game is finished — current
+**batting & bowling figures**, the **last few balls** of commentary (with wickets
+and boundaries flagged), a **DLS par score** in limited-overs games (a "are they
+ahead or behind?" indicator), end-of-day / stumps summaries for multi-day games,
+and a **win-probability estimate**.
 
 ```
 $ stumps
@@ -24,7 +28,7 @@ $ stumps
 source: cricinfo
 
 ╭─  ● LIVE   New Zealand v India ───────────────────────────────────╮
-│ India need 71 runs from 72 balls                                  │
+│ India require 71 runs from 12.0 overs                             │
 │ New Zealand 280/8 (50.0 ov)   India 210/4 (38.0 ov)               │
 │ Batting                                                           │
 │ V Kohli *  92  88  7/1  105                                       │
