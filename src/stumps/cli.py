@@ -89,6 +89,10 @@ def _show_parser() -> argparse.ArgumentParser:
     c.add_argument("--no-commentary", action="store_true", help="hide recent balls")
     c.add_argument("--balls", type=int, default=None, metavar="N",
                    help="how many recent balls to show (default 6)")
+    c.add_argument("--test-model", action="store_true",
+                   help="use the trained multi-day model for Test/first-class "
+                        "win probability (needs `stumps train --multiday`); "
+                        "the heuristic is the default")
     c.add_argument("--plain", action="store_true", help="disable colour")
 
     o = p.add_argument_group("output / data")
@@ -106,15 +110,22 @@ def _show_parser() -> argparse.ArgumentParser:
 def _train_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stumps train",
-        description="Train the limited-overs win-probability model from Cricsheet.",
+        description="Train a win-probability model from Cricsheet. Defaults to "
+                    "the limited-overs chase model; --multiday trains the "
+                    "Test/first-class win/lose/draw model.",
     )
-    p.add_argument("--formats", nargs="+", default=["odi", "t20i"],
-                   choices=["odi", "t20i"],
-                   help="Cricsheet bundles to train on (default: odi t20i)")
+    p.add_argument("--multiday", action="store_true",
+                   help="train the multi-day (Test/first-class) model instead of "
+                        "the limited-overs chase model")
+    p.add_argument("--formats", nargs="+", default=None,
+                   choices=["odi", "t20i", "test"],
+                   help="Cricsheet bundles to train on "
+                        "(default: odi t20i, or test with --multiday)")
     p.add_argument("--max-matches", type=int, default=None,
                    help="limit matches parsed (for a quick run)")
-    p.add_argument("--sample-every", type=int, default=6,
-                   help="keep one training row per N balls (default 6 = per over)")
+    p.add_argument("--sample-every", type=int, default=None,
+                   help="keep one training row per N balls "
+                        "(default 6 for chase, 12 for --multiday)")
     p.add_argument("--force-download", action="store_true",
                    help="re-download Cricsheet bundles even if cached")
     return p
@@ -249,23 +260,30 @@ def _config_wizard(console: Console, existing: dict) -> dict:
 
 
 def _run_train(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
     from stumps.config import load_settings as _ls
 
     settings = _ls()
     console = Console()
-    console.print("[bold]Training win-probability model[/bold] from Cricsheet…")
+    multiday = getattr(args, "multiday", False)
+    formats = args.formats or (["test"] if multiday else ["odi", "t20i"])
+    sample_every = args.sample_every if args.sample_every is not None else (
+        12 if multiday else 6)
+
+    kind = "multi-day Test/first-class" if multiday else "limited-overs chase"
+    console.print(f"[bold]Training {kind} win-probability model[/bold] from Cricsheet…")
     console.print("[dim]downloading bundles (cached after first run) and parsing[/dim]")
 
     if args.force_download:
-        for fmt in args.formats:
-            from stumps.winprob.cricsheet import BUNDLES
-            from pathlib import Path
-
-            name = Path(BUNDLES[fmt]).name
-            (settings.cache_dir / name).unlink(missing_ok=True)
+        from stumps.winprob.cricsheet import BUNDLES, MD_BUNDLES
+        bundles = MD_BUNDLES if multiday else BUNDLES
+        for fmt in formats:
+            if fmt in bundles:
+                (settings.cache_dir / Path(bundles[fmt]).name).unlink(missing_ok=True)
 
     try:
-        from stumps.winprob.train import train
+        from stumps.winprob.train import train, train_multiday
     except ImportError:
         console.print(
             "[red]Training needs the 'winprob' extra:[/red] "
@@ -276,12 +294,13 @@ def _run_train(args: argparse.Namespace) -> int:
     def progress(matches: int, rows: int) -> None:
         console.print(f"  [dim]…{matches:,} matches, {rows:,} rows[/dim]")
 
+    train_fn = train_multiday if multiday else train
     try:
-        report = train(
+        report = train_fn(
             settings,
-            formats=args.formats,
+            formats=formats,
             max_matches=args.max_matches,
-            sample_every=args.sample_every,
+            sample_every=sample_every,
             progress=progress,
         )
     except ImportError:

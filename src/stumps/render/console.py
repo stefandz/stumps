@@ -357,6 +357,7 @@ def _winprob_block(est: WinEstimate, accent: str) -> Group:
         "heuristic": "rule-of-thumb (no model loaded)",
         "first-innings-heuristic": "first-innings projection",
         "test-heuristic": "rough Test lean",
+        "multiday-model": "Cricsheet-trained Test model",
         "settled": "match decided",
     }.get(est.method, est.method)
     for line in est.extra:
@@ -428,7 +429,8 @@ def _match_panel(
                 body.append(recent)
 
         if prefs.show_winprob:
-            est = estimate(match, settings)
+            est = estimate(match, settings,
+                           use_multiday_model=prefs.use_multiday_model)
             if est is not None:
                 body.append(_winprob_block(est, accent))
 

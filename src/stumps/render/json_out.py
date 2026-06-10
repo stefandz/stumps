@@ -78,7 +78,7 @@ def _match_dict(match: Match, cls: Classification, settings: Settings,
     if active and prefs.show_dls:
         d["dls"] = _dls_dict(match)
     if active and prefs.show_winprob:
-        est = estimate(match, settings)
+        est = estimate(match, settings, use_multiday_model=prefs.use_multiday_model)
         d["win_probability"] = (
             None if est is None
             else {"method": est.method, "probabilities": est.probabilities}

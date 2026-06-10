@@ -175,6 +175,8 @@ def _county_championship_live() -> Match:
         phase=Phase.LIVE,
         day_number=3,
         total_days=4,
+        local_time="15:30",
+        close_time="18:00",
         session="Afternoon, Day 3",
         venue="The Oval, London",
         status_text="Lancashire lead by 88 runs with 7 second-innings wickets in hand",

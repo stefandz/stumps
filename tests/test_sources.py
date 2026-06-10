@@ -189,6 +189,29 @@ def test_espn_completed_prefers_result_detail(settings):
     assert match.status_text == "England Women won by 5 runs"
 
 
+def test_espn_multiday_timing_from_notes(settings):
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    match = Match(match_id="m", format=Format.FIRST_CLASS, phase=Phase.LIVE,
+                  teams=[Team("Surrey"), Team("Hampshire")])
+    summary = {
+        "header": {"competitions": [{"status": {"presentLocalTime": "16:30"}}]},
+        "notes": [
+            {"type": "hoursofplay",
+             "text": "10.00 start, Lunch 12.00-12.40, Tea 14.40-15.00, Close 17.00"},
+            {"type": "matchdays", "text": "7,8,9,10 June 2026 (4-day match)"},
+            {"type": "closeofplay", "text": "day 1 - ..."},
+            {"type": "closeofplay", "text": "day 2 - ..."},
+            {"type": "closeofplay", "text": "day 3 - ..."},
+        ],
+    }
+    src._apply_multiday_timing(match, summary)
+    assert match.local_time == "16:30"
+    assert match.close_time == "17:00"
+    assert match.total_days == 4
+    assert match.day_number == 4  # 3 completed days -> day 4 in progress
+
+
 def test_espn_completed_falls_back_to_summary(settings):
     # If detail is absent, keep whatever summary we have rather than blanking it.
     src = EspnSource(settings)

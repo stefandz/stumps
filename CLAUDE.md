@@ -102,15 +102,31 @@ sources/* ── Match objects ──> prioritise ──> render
   are deliberately labelled "indicative".
 
 - **`winprob/`** — the home-grown win estimate (**not** WinViz; it's proprietary
-  with no API). `state.py` defines `FEATURE_ORDER` — the *single source of truth*
-  for the feature vector, shared by training and inference so they can't drift.
-  `cricsheet.py` downloads + parses Cricsheet ball-by-ball into chase rows;
-  `train.py` fits a `HistGradientBoostingClassifier` and pickles
-  `{model, order, ...}` to `~/.cache/stumps/winprob_model.pkl`. `estimator.py`
-  loads that model if present (else a transparent heuristic) for limited-overs
-  chases, a projection heuristic for first innings, and a crude lead/time lean
-  for Tests. The trained model only covers **limited-overs second-innings
-  chases** — that's the clean, well-defined case.
+  with no API — and its endpoints carry no probability field anyway). Two feature
+  contracts, each a *single source of truth* shared by training and inference so
+  they can't drift: `state.py:FEATURE_ORDER` for the limited-overs chase, and
+  `multiday.py:FEATURE_ORDER_MD` for Tests/first-class. `cricsheet.py` downloads
+  + parses Cricsheet ball-by-ball into chase rows *and* multi-day rows;
+  `train.py` fits a `HistGradientBoostingClassifier` for each — the chase model
+  (binary, `~/.cache/stumps/winprob_model.pkl`) and the multi-day model (3-class
+  win/lose/draw, `winprob_multiday_model.pkl`, via `stumps train --multiday`).
+  `estimator.py` routes:
+  - **limited-overs chase** → trained chase model if present, else a transparent
+    run-rate heuristic; **first innings** → a projected-score heuristic.
+  - **multi-day** → the **overs-aware heuristic by default** (`_test_estimate`):
+    for a fourth innings it's a proper win/lose/**draw** 3-way (the side batting
+    last can draw by surviving, so a big deficit is *not* a near-loss — this is
+    what made the old aggregate-lead lean say "96% to the team that's actually
+    going to draw"); innings 1–3 keep a lead-and-time lean. The opt-in trained
+    multi-day model is used only with `--test-model` (`Preferences.use_multiday_model`),
+    falling back to the heuristic if the model is absent.
+  - **The dominant input for multi-day is overs remaining**, which no feed gives
+    directly. `multiday.overs_remaining_estimate` reconstructs it from the
+    scheduled close + present local time (parsed by `espn._apply_multiday_timing`
+    from the summary `notes`: `hoursofplay` close, `matchdays` total days,
+    `closeofplay` count → current day) at ~3.75 min/over (96/day for first-class,
+    90 for Tests), falling back to a mid-day prior. The B model trains on a
+    days-based proxy for the same quantity. Both are labelled "rough"/an estimate.
 
 - **`render/console.py`** — all rich output; honours `Preferences` toggles
   (`--compact`, `--no-figures/-winprob/-dls/-commentary`, `--plain`). It

@@ -373,6 +373,10 @@ class Settings:
     winprob_model_path: Path = field(
         default_factory=lambda: _default_cache_dir() / "winprob_model.pkl"
     )
+    #: Path to the (optional, opt-in) trained multi-day Test/first-class model.
+    winprob_multiday_model_path: Path = field(
+        default_factory=lambda: _default_cache_dir() / "winprob_multiday_model.pkl"
+    )
     #: ESPN scoreboard region (gb, in, au, …) — affects coverage emphasis.
     region: str = "gb"
 

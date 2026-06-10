@@ -61,7 +61,9 @@ stumps --womens-only    # or --mens-only
 stumps --all            # include every match, not just ones of interest
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
 stumps --demo           # built-in sample data (offline; great for a quick look)
-stumps train            # train the win-probability model from Cricsheet
+stumps --test-model     # use the trained multi-day model for Tests (opt-in)
+stumps train            # train the limited-overs chase model from Cricsheet
+stumps train --multiday # train the optional Test/first-class win/lose/draw model
 ```
 
 `stumps --help` lists every flag, grouped into *follow*, *filtering*, *display*,
@@ -175,8 +177,19 @@ has no public API) and not ESPNcricinfo's Forecaster (not exposed as data).
   trained model — or without scikit-learn — it falls back to a transparent
   run-rate/wickets heuristic.
 - **First innings** use a rough projected-score-vs-par heuristic.
-- **Tests** use a crude lead/time-based lean (win/win/draw). Test win-probability
-  is genuinely hard; treat these as a *lean*, not a number.
+- **Tests / first-class** use an **overs-aware win/lose/draw** estimate. The key
+  driver of a draw is how much time is left, so `stumps` reconstructs the overs
+  remaining from the scheduled close and the current local time at the ground.
+  In a fourth innings it models all three outcomes properly — the side batting
+  last can secure a draw simply by surviving, so a big lead is *not* a near-win
+  (e.g. "281 to win, 8 wickets, ~24 overs left" comes out ~96% Draw, not 96% to
+  the side that's bowling).
+
+  This heuristic is the **default**. There's also an **optional trained model**
+  (3-class, from Cricsheet Test data): build it with `stumps train --multiday`,
+  then enable it per-run with `stumps --test-model`. It falls back to the
+  heuristic if no model is present. Either way, treat Test win-probability as a
+  *lean* — it's genuinely hard, and always labelled an estimate.
 
 ## DLS par scores
 

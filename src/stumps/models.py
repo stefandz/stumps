@@ -193,6 +193,10 @@ class Match:
     day_number: int | None = None
     total_days: int | None = None
     session: str = ""  # "Lunch", "Tea", "Stumps", ...
+    #: Wall-clock context at the ground, used to estimate overs left on the day
+    #: for the multi-day win/draw model. HH:MM strings; empty when unknown.
+    local_time: str = ""   # current local time at the venue
+    close_time: str = ""   # scheduled close of play
     source: str = ""  # which data source produced this
     ball_by_ball_available: bool = False  # does the source expose commentary?
     recent_balls: list[Ball] = field(default_factory=list)  # most recent first

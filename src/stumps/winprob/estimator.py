@@ -17,6 +17,12 @@ from pathlib import Path
 
 from stumps.config import Settings, load_settings
 from stumps.models import Format, Match
+from stumps.winprob.multiday import (
+    MultiDayState,
+    extract_multiday_state,
+    feature_vector_md,
+    overs_per_day,
+)
 from stumps.winprob.state import (
     ChaseState,
     extract_chase_state,
@@ -70,6 +76,24 @@ def _load_model(path_str: str) -> dict | None:
         with path.open("rb") as fh:
             artifact = pickle.load(fh)
         if "model" in artifact and "order" in artifact:
+            return artifact
+    except Exception:
+        return None
+    return None
+
+
+@lru_cache(maxsize=2)
+def _load_multiday_model(path_str: str) -> dict | None:
+    """Load the multi-day model artifact (must carry ``multiday: True``)."""
+    path = Path(path_str)
+    if not path.exists():
+        return None
+    try:
+        import sklearn  # noqa: F401
+
+        with path.open("rb") as fh:
+            artifact = pickle.load(fh)
+        if artifact.get("multiday") and "model" in artifact and "order" in artifact:
             return artifact
     except Exception:
         return None
@@ -155,41 +179,122 @@ def _first_innings_estimate(match: Match) -> WinEstimate | None:
     )
 
 
-def _test_estimate(match: Match) -> WinEstimate | None:
-    if len(match.teams) < 2:
-        return None
-    a, b = match.team_names[0], match.team_names[1]
+def _fourth_innings_probs(state: MultiDayState) -> tuple[float, float, float]:
+    """(batting-side win, bowling-side win, draw) for a fourth-innings position.
 
-    def total(team: str) -> int:
-        return sum(i.runs for i in match.innings if team.lower() in i.batting_team.lower())
+    The key asymmetry the old lead-based lean missed: the side batting last can
+    secure a *draw* simply by surviving the overs left, so a big deficit is not a
+    near-certain loss. A result needs either the target reached (batting win) or
+    all standing wickets taken in time (bowling win)."""
+    overs = max(0.0, state.overs_remaining)
+    wih = state.wickets_in_hand
+    need = state.runs_to_win
+    if need <= 0:                      # target already overhauled
+        return 1.0, 0.0, 0.0
+    if wih <= 0 or overs <= 0:         # innings over / time up, target not reached
+        return 0.0, 1.0, 0.0
 
-    def innings_count(team: str) -> int:
-        return sum(1 for i in match.innings if team.lower() in i.batting_team.lower())
+    rrr = need / overs                 # runs per over required
+    # Can the target realistically be chased? ~4.5 rpo is a stiff-but-doable
+    # fourth-innings rate; temper by wickets in hand.
+    gettable = _logistic(1.1 * (4.5 - rrr))
+    wkt_ok = _logistic(0.5 * (wih - 3))
+    p_bat = gettable * wkt_ok
+    # Time to bowl them out? A side batting to save the game loses a wicket
+    # roughly every ~12.5 overs; enough such overs to take the standing wickets
+    # favours the bowling side.
+    p_bowl = (1.0 - p_bat) * _logistic(0.55 * (overs / 12.5 - wih))
+    p_draw = max(0.0, 1.0 - p_bat - p_bowl)
+    return p_bat, p_bowl, p_draw
 
-    net = total(a) - total(b)
-    dominance = math.tanh(net / 120.0)
-    # Mute the lean until both sides have batted (a one-sided scorecard isn't a
-    # real advantage — the other team simply hasn't batted yet).
-    if min(innings_count(a), innings_count(b)) == 0:
+
+def _early_innings_probs(state: MultiDayState) -> dict[str, float]:
+    """Innings 1–3: a lead-and-time lean. Plenty of overs left -> a result is
+    likely; running out of time with no dominance -> a draw."""
+    dominance = math.tanh(state.lead / 120.0)
+    # A one-sided scorecard (only one side has batted) isn't a real advantage.
+    if state.innings_number <= 1:
         dominance *= 0.25
 
-    # Time left drives draw likelihood: lots of time -> results; running out with
-    # no dominance -> draw.
-    if match.day_number and match.total_days:
-        remaining = max(0.0, (match.total_days - match.day_number) / match.total_days)
-    else:
-        remaining = 0.4
-    draw = (1 - abs(dominance)) * (0.6 - 0.5 * remaining)
+    total_overs = max(1, state.total_days) * overs_per_day(
+        # any multi-day format works for the per-day figure
+        Format.TEST if state.total_days >= 5 else Format.FIRST_CLASS
+    )
+    fraction_left = min(1.0, state.overs_remaining / total_overs)
+    draw = (1 - abs(dominance)) * (0.6 - 0.5 * fraction_left)
     draw = min(0.9, max(0.03, draw))
 
     share = 1 - draw
-    p_a = share * (0.5 + 0.5 * dominance)
-    p_b = share * (0.5 - 0.5 * dominance)
+    return {
+        state.batting_team: share * (0.5 + 0.5 * dominance),
+        state.bowling_team: share * (0.5 - 0.5 * dominance),
+        "Draw": draw,
+    }
+
+
+def _test_estimate(match: Match) -> WinEstimate | None:
+    state = extract_multiday_state(match)
+    if state is None:
+        return None
+
+    extra: list[str] = []
+    if state.is_fourth_innings:
+        p_bat, p_bowl, p_draw = _fourth_innings_probs(state)
+        probs = {
+            state.batting_team: p_bat,
+            state.bowling_team: p_bowl,
+            "Draw": p_draw,
+        }
+        if state.runs_to_win > 0:
+            extra.append(
+                f"~{state.overs_remaining:.0f} overs left; {state.batting_team} "
+                f"need {state.runs_to_win} at {state.required_run_rate:.1f}/over, "
+                f"{state.wickets_in_hand} wkts in hand"
+            )
+    else:
+        probs = _early_innings_probs(state)
+        extra.append(f"~{state.overs_remaining:.0f} overs left in the match")
+
+    probs = {k: round(v, 3) for k, v in probs.items()}
     return WinEstimate(
-        probabilities={a: round(p_a, 3), b: round(p_b, 3), "Draw": round(draw, 3)},
+        probabilities=probs,
         method="test-heuristic",
         note=NOT_WINVIZ + " · Test leans are rough",
+        extra=extra,
     )
+
+
+def _multiday_model_estimate(match: Match, settings: Settings) -> WinEstimate | None:
+    """Trained multi-day model estimate, or None (no model / not applicable)."""
+    artifact = _load_multiday_model(str(settings.winprob_multiday_model_path))
+    if artifact is None:
+        return None
+    state = extract_multiday_state(match)
+    if state is None:
+        return None
+    try:
+        model = artifact["model"]
+        proba = model.predict_proba([feature_vector_md(state)])[0]
+        classes = list(model.classes_)
+        # Class framing (see cricsheet.multiday_rows_from_match): 1 = batting side
+        # wins, 0 = bowling side wins, 2 = draw.
+        def p(cls: int) -> float:
+            return float(proba[classes.index(cls)]) if cls in classes else 0.0
+        probs = {
+            state.batting_team: round(p(1), 3),
+            state.bowling_team: round(p(0), 3),
+            "Draw": round(p(2), 3),
+        }
+    except Exception:
+        return None
+    extra = [f"~{state.overs_remaining:.0f} overs left in the match"]
+    if state.is_fourth_innings and state.runs_to_win > 0:
+        extra = [
+            f"~{state.overs_remaining:.0f} overs left; {state.batting_team} "
+            f"need {state.runs_to_win} at {state.required_run_rate:.1f}/over, "
+            f"{state.wickets_in_hand} wkts in hand"
+        ]
+    return WinEstimate(probabilities=probs, method="multiday-model", extra=extra)
 
 
 # --------------------------------------------------------------------------
@@ -197,8 +302,17 @@ def _test_estimate(match: Match) -> WinEstimate | None:
 # --------------------------------------------------------------------------
 
 
-def estimate(match: Match, settings: Settings | None = None) -> WinEstimate | None:
-    """Best available win-probability estimate for a match, or None."""
+def estimate(
+    match: Match,
+    settings: Settings | None = None,
+    *,
+    use_multiday_model: bool = False,
+) -> WinEstimate | None:
+    """Best available win-probability estimate for a match, or None.
+
+    For multi-day games the transparent heuristic is the default; the trained
+    multi-day model is used only when ``use_multiday_model`` is set (CLI
+    ``--test-model``) and a model is present, falling back to the heuristic."""
     settings = settings or load_settings()
 
     # No scoring data yet -> nothing meaningful to estimate from.
@@ -233,6 +347,10 @@ def estimate(match: Match, settings: Settings | None = None) -> WinEstimate | No
         return _first_innings_estimate(match)
 
     if match.format.is_multi_day:
+        if use_multiday_model:
+            est = _multiday_model_estimate(match, settings)
+            if est is not None:
+                return est
         return _test_estimate(match)
 
     return None

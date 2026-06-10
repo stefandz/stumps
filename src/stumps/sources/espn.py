@@ -16,6 +16,7 @@ Field access is defensive; if ESPN changes shape we degrade rather than crash.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from stumps import config
@@ -231,9 +232,42 @@ class EspnSource(DataSource):
         innings = self._innings_from_summary(data)
         if innings:
             match.innings = innings
+        if match.format.is_multi_day:
+            self._apply_multiday_timing(match, data)
         if match.ball_by_ball_available and match.phase.is_active_today:
             match.recent_balls = self._recent_balls(match.match_id)
         return match
+
+    @staticmethod
+    def _apply_multiday_timing(match: Match, data: dict) -> None:
+        """Fill the multi-day timing context the win/draw estimate needs from the
+        summary `notes` block (which the scoreboard list lacks): the scheduled
+        close, total days, current day, and the present local time. All defensive
+        — anything missing just stays as-is."""
+        comp = (_dig(data, "header", "competitions") or [{}])[0]
+        status = comp.get("status") or {}
+        by_type: dict[str, list[dict]] = {}
+        for note in data.get("notes") or []:
+            by_type.setdefault(note.get("type") or "", []).append(note)
+
+        local = status.get("presentLocalTime")
+        if local:
+            match.local_time = str(local)
+
+        hours = (by_type.get("hoursofplay") or [{}])[0].get("text") or ""
+        m = re.search(r"[Cc]lose\s+(\d{1,2})[.:](\d{2})", hours)
+        if m:
+            match.close_time = f"{int(m.group(1)):02d}:{m.group(2)}"
+
+        days = (by_type.get("matchdays") or [{}])[0].get("text") or ""
+        m = re.search(r"\((\d+)\s*-?\s*day", days)
+        if m:
+            match.total_days = int(m.group(1))
+
+        # One `closeofplay` note per completed day -> current day is the next one.
+        completed = len(by_type.get("closeofplay") or [])
+        if completed and match.total_days:
+            match.day_number = min(match.total_days, completed + 1)
 
     def _recent_balls(self, event_id: str, limit: int = 10) -> list[Ball]:
         """Most recent deliveries (newest first). Commentary paginates

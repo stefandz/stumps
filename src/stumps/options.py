@@ -50,6 +50,8 @@ class Preferences:
     show_dls: bool = True
     show_commentary: bool = True
     balls: int = 6
+    #: Use the trained multi-day Test/first-class model instead of the heuristic.
+    use_multiday_model: bool = False
 
     # D — output
     json_output: bool = False
@@ -108,5 +110,6 @@ class Preferences:
         prefs.show_commentary = not getattr(args, "no_commentary", False)
         if getattr(args, "balls", None) is not None:
             prefs.balls = args.balls
+        prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
         return prefs
