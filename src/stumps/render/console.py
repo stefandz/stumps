@@ -7,6 +7,8 @@ chases, and a win-probability bar — labelled as an estimate, not WinViz.
 
 from __future__ import annotations
 
+import re
+
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
@@ -39,15 +41,41 @@ _TIER_ACCENT = {
 }
 
 #: Bare state labels that the phase badge already conveys — never worth showing
-#: as a headline (e.g. a finished game whose only status text is "Result").
+#: as a headline (e.g. a finished game whose only status text is "Result"). The
+#: break labels live here too because the BREAK badge now names the interval
+#: itself (see `_break_badge_label`), so echoing the bare word adds nothing.
 _GENERIC_STATUS = {
     "live", "stumps", "tea", "lunch", "drinks", "close", "close of play",
-    "result", "stump",
+    "result", "stump", "final", "completed", "match ended", "end of match",
+    "rain", "bad light", "innings break", "break",
 }
+
+#: Specific break labels, most-specific first, matched as whole words against
+#: the status text so the otherwise-generic "⏸ BREAK" badge can name the actual
+#: interval (tea / lunch / rain / ...). Keeps the colour + pause glyph the user
+#: likes while preserving the information the generic label threw away.
+_BREAK_LABELS = (
+    ("innings break", "INNINGS"),
+    ("bad light", "BAD LIGHT"),
+    ("lunch", "LUNCH"),
+    ("tea", "TEA"),
+    ("drinks", "DRINKS"),
+    ("rain", "RAIN"),
+)
+
+
+def _break_badge_label(match: Match) -> str:
+    text = match.status_text.lower()
+    for keyword, label in _BREAK_LABELS:
+        if re.search(rf"\b{re.escape(keyword)}\b", text):
+            return f"⏸ {label}"
+    return "⏸ BREAK"
 
 
 def _phase_badge(match: Match) -> Text:
     label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
+    if match.phase is Phase.BREAK:
+        label = _break_badge_label(match)
     return Text(f" {label} ", style=style)
 
 
@@ -222,35 +250,45 @@ def _headline(match: Match) -> str:
 
 def _synth_result(match: Match) -> str | None:
     """Best-effort result line for a finished limited-overs match when the feed
-    gave us no usable text. Deliberately conservative: only the unambiguous
-    chase case, where the second innings carries a target so we know who batted
-    when and can read off the margin. Skipped for multi-day games (a draw isn't
-    derivable from scores) and for D/L-affected games (the visible totals would
-    yield a wrong margin)."""
+    gave us no usable text (just "Result"/"Final"). Deliberately conservative:
+    skipped for multi-day games (a draw isn't derivable from scores) and for
+    D/L-affected ones (the visible totals would yield a wrong margin).
+
+    With a target on the second innings we know who batted when and can give the
+    full margin ("won by N runs/wickets"). Without one we can't tell who batted
+    first, so the *type* of margin is ambiguous — we name the winner from the
+    totals (unambiguous for a non-D/L game) but leave the margin off."""
     if not match.format.is_limited_overs or len(match.innings) < 2:
         return None
     blob = f"{match.status_text} {match.result_text}".lower()
     if any(k in blob for k in ("dls", "d/l", "duckworth")):
         return None
+
     chase = next((i for i in match.innings if (i.target or 0) > 0), None)
-    if chase is None:
-        return None
-    target = chase.target
-    if chase.runs >= target:  # chase completed
-        wkts = max(0, 10 - chase.wickets)
-        unit = "wicket" if wkts == 1 else "wickets"
-        return f"{chase.batting_team} won by {wkts} {unit}"
-    if chase.runs == target - 1:  # scores level, chase over
+    if chase is not None:
+        target = chase.target
+        if chase.runs >= target:  # chase completed
+            wkts = max(0, 10 - chase.wickets)
+            unit = "wicket" if wkts == 1 else "wickets"
+            return f"{chase.batting_team} won by {wkts} {unit}"
+        if chase.runs == target - 1:  # scores level, chase over
+            return "Match tied"
+        defending = next(
+            (n for n in match.team_names if n.lower() != chase.batting_team.lower()),
+            None,
+        )
+        if defending is None:
+            return None
+        margin = (target - 1) - chase.runs
+        unit = "run" if margin == 1 else "runs"
+        return f"{defending} won by {margin} {unit}"
+
+    # No target on either innings — winner by totals, margin omitted.
+    first, second = match.innings[0], match.innings[1]
+    if first.runs == second.runs:
         return "Match tied"
-    defending = next(
-        (n for n in match.team_names if n.lower() != chase.batting_team.lower()),
-        None,
-    )
-    if defending is None:
-        return None
-    margin = (target - 1) - chase.runs
-    unit = "run" if margin == 1 else "runs"
-    return f"{defending} won by {margin} {unit}"
+    winner = first if first.runs > second.runs else second
+    return f"{winner.batting_team} won"
 
 
 def _recent_balls_block(match: Match, limit: int = 6) -> Group | None:

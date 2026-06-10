@@ -44,6 +44,16 @@ def test_bare_result_headline_suppressed():
     assert any("South Africa won by 4 wickets" in ln for ln in lines)
 
 
+def test_bare_final_headline_synthesised():
+    # ESPN also emits the bare label "Final" — treat it like "Result".
+    import dataclasses
+    completed = next(m for m in sample_matches() if m.phase is Phase.COMPLETE)
+    bare = dataclasses.replace(completed, status_text="Final", result_text="Final")
+    lines = [ln.strip() for ln in _render(bare, _settings()).splitlines()]
+    assert "Final" not in lines
+    assert any("South Africa won by 4 wickets" in ln for ln in lines)
+
+
 # -- synthesised result fallback --------------------------------------------
 
 
@@ -91,6 +101,16 @@ def test_synth_result_singular_units():
     ) == "India won by 1 run"
 
 
+def test_synth_result_winner_only_without_target():
+    # No target on either innings -> we can't tell who batted first, so name the
+    # winner from the totals but omit the (ambiguous) margin.
+    m = _completed_lo(("England", 171, 6), ("India", 166, 10, 0))
+    assert _synth_result(m) == "England won"
+    # Equal totals with no target -> a tie.
+    assert _synth_result(_completed_lo(("England", 170, 8), ("India", 170, 10, 0))) \
+        == "Match tied"
+
+
 def test_synth_result_skips_dls():
     # A D/L result re-weights the target; visible totals give a wrong margin,
     # so we defer to the (here absent) feed text rather than guess.
@@ -117,6 +137,39 @@ def test_synth_result_skips_multi_day():
         ],
     )
     assert _synth_result(m) is None  # draw vs win isn't derivable from scores
+
+
+def test_break_badge_names_the_interval():
+    from stumps.models import Match, Team
+    from stumps.render.console import _break_badge_label
+
+    def brk(status):
+        return Match(match_id="b", format=Format.TEST, phase=Phase.BREAK,
+                     teams=[Team("Eng", "ENG"), Team("Aus", "AUS")],
+                     status_text=status)
+
+    assert _break_badge_label(brk("Tea")) == "⏸ TEA"
+    assert _break_badge_label(brk("Lunch - England 250/4")) == "⏸ LUNCH"
+    assert _break_badge_label(brk("Drinks break")) == "⏸ DRINKS"
+    assert _break_badge_label(brk("Rain has stopped play")) == "⏸ RAIN"
+    assert _break_badge_label(brk("Bad light stopped play")) == "⏸ BAD LIGHT"
+    assert _break_badge_label(brk("Innings break")) == "⏸ INNINGS"
+    assert _break_badge_label(brk("Players off the field")) == "⏸ BREAK"
+    # "team" must not trip the "tea" match.
+    assert _break_badge_label(brk("Both teams warming up")) == "⏸ BREAK"
+
+
+def test_break_panel_shows_interval_not_generic_headline():
+    from stumps.models import Innings, Match, Team
+    match = Match(
+        match_id="b", format=Format.TEST, phase=Phase.BREAK,
+        teams=[Team("England", "ENG"), Team("Australia", "AUS")],
+        status_text="Tea", source="demo",
+        innings=[Innings("England", "Australia", 1, 250, 4, 80.0)],
+    )
+    lines = [ln.strip() for ln in _render(match, _settings()).splitlines()]
+    assert any("TEA" in ln for ln in lines)        # badge names the interval
+    assert "Tea" not in lines                       # no redundant headline line
 
 
 def test_winprob_shown_for_live_chase():
