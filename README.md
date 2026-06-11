@@ -88,6 +88,53 @@ stumps train --multiday # train the optional Test/first-class win/lose/draw mode
 `stumps --help` lists every flag, grouped into *follow*, *filtering*, *display*,
 and *output*.
 
+### Drill into a match — `--match`
+
+`--match TEXT` picks a single match (a case-insensitive substring of the teams
+or series — "v" and "vs" both work, e.g. `--match "england vs india"`) and shows
+the **full scorecard**: every innings in batting order with how-out, full bowling
+figures, partnerships drawn as a back-to-back bar of each batter's runs on a
+shared centre line, plus the toss and the umpires.
+
+```
+$ stumps --match "england v india"
+╭─  ✓ RESULT   England v India ──────────────────────────────────────────╮
+│ England won by 14 runs                                                 │
+│ Toss  India, elected to field first                                    │
+│                                                                        │
+│ 1st innings — England 182/6  (20.0 ov)                                 │
+│ Batting             R     B    4s/6s     SR    how out                 │
+│ P Salt             55    38      7/2    145    caught                  │
+│ J Buttler          43    29      4/2    148    bowled                  │
+│ H Brook            31    22      2/1    141    lbw                     │
+│ L Livingstone *    28    16      1/2    175    not out                 │
+│ J Bairstow *       12    15      1/0     80    not out                 │
+│ Bowling             O    M     R    W    Econ                          │
+│ J Bumrah          4.0    0    28    2     7.0                          │
+│ K Yadav           4.0    0    33    2     8.2                          │
+│ Partnerships                                                           │
+│  1st   98 (10.2)    Salt 55 ████████████│█████████    Buttler 40       │
+│  2nd   44 ( 4.1)  Buttler 3            █│███████      Brook 31         │
+│  3rd   40 ( 5.3)    Brook 0             │█████        Livingstone 22   │
+│                                                                        │
+│ 2nd innings — India 168/8  (20.0 ov)                                   │
+│ Batting       R     B    4s/6s     SR    how out                       │
+│ Y Jaiswal    62    41      8/2    151    caught                        │
+│ S Samson     34    28      3/1    121    run out                       │
+│ Bowling       O    M     R    W    Econ                                │
+│ J Archer    4.0    0    31    3     7.8                                │
+│ Partnerships                                                           │
+│  1st   70 ( 7.4)  Jaiswal 44 ████████████│███████      Samson 24       │
+│ Umpires  M Erasmus · R Kettleborough                                   │
+╰─ Today · T20I · India tour of England 2026 · Lord's, London ───────────╯
+```
+
+In the partnerships bar the left (cyan) half is the first batter's runs and the
+right (magenta) half the second's, scaled so the centre line lines up down the
+whole innings — an at-a-glance read of who made the runs. (The how-out column
+shows the dismissal *mode*; the bowler/fielder names aren't in the feed's
+scorecard.)
+
 ### Make it yours
 
 Set your defaults once so you don't repeat flags every run. The easiest way is
