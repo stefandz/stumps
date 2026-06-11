@@ -111,6 +111,23 @@ def test_full_priority_order_on_sample():
     assert ranked[0][1].tier is Tier.FOLLOWED
 
 
+def test_live_associate_international_not_surfaced_by_default():
+    # A live international with no full-member nation is noise at the default
+    # (domestic) floor — the catch-all is for full-member internationals.
+    assoc = _match(Format.WT20I, "Kwibuka Women's T20", "Rwanda Women", "Malawi Women")
+    assert prioritise([assoc]) == []
+    # A full-member international is still surfaced while live.
+    fm = _match(Format.T20I, "Bilateral", "Australia", "Zimbabwe")
+    assert [m for m, _ in prioritise([fm])] == [fm]
+    # --all (tier floor = all) shows the associate game too.
+    assert [m for m, _ in prioritise([assoc], Preferences(tier_floor=int(Tier.OTHER)))] \
+        == [assoc]
+    # The catch-all is live-only: a finished full-member game that doesn't
+    # otherwise qualify still isn't surfaced at the domestic floor.
+    done = _match(Format.T20I, "Bilateral", "Australia", "Zimbabwe", phase=Phase.COMPLETE)
+    assert prioritise([done]) == []
+
+
 def test_filter_live_only():
     ranked = prioritise(sample_matches(), Preferences(live_only=True))
     assert all(m.phase.is_active_today for m, _ in ranked)

@@ -9,7 +9,8 @@ via `--team`):
    tournaments** (World Cup, T20 World Cup, Champions Trophy, WTC final).
 3. Then your **home domestic** cricket — England's counties by default; India or
    Australia via `--domestic`.
-4. Everything else last (and only if it's a live international).
+4. Everything else last — and by default only a **live international involving a
+   full-member nation**; associate-vs-associate games need `--all` (or `--tier all`).
 
 For each match you get the live score, a synthesised headline that frames the
 chase — "India require 71 runs from 12.0 overs" in limited-overs games (dropping

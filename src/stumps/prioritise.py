@@ -5,7 +5,8 @@ Priority policy:
   2. Then top-tier Test matches (two ICC full members) and premier ICC
      tournaments (World Cup, T20 World Cup, Champions Trophy, WTC final).
   3. Then your home domestic cricket (England by default; India/Australia/…).
-  4. Everything else, last (and by default only if it's a live international).
+  4. Everything else, last (and by default only if it's a live international
+     involving a full-member nation; pure associate games need --all).
 
 Within a tier: live games first, then ones paused at stumps / a break, then
 recently finished (for end-of-day summaries), then upcoming. Filtering (formats,
@@ -97,6 +98,14 @@ def is_home_domestic(match: Match, domestic: str | None = "england") -> bool:
     return any(marker in series for marker in scene.series_markers)
 
 
+def _involves_full_member(match: Match) -> bool:
+    """True if at least one team is an ICC full-member nation. Keeps the
+    'surface a live international' catch-all to internationals of real note,
+    rather than associate-vs-associate games (Austria v Finland, Rwanda Women v
+    Malawi Women) — which are still reachable via --all / --tier all."""
+    return _any_fragment(_lower_names(match), config.TOP_TIER_TEST_NATIONS)
+
+
 def is_womens(match: Match) -> bool:
     if match.format.is_womens:
         return True
@@ -184,12 +193,14 @@ def _passes_tier(match: Match, cls: Classification, prefs: Preferences) -> bool:
     if int(cls.tier) <= prefs.tier_floor:
         return True
     # When the floor includes domestic, still surface a live international that
-    # didn't otherwise qualify (e.g. a marquee game between two teams you don't
-    # follow) — but not for the stricter followed/premier floors.
+    # didn't otherwise qualify (e.g. a marquee game between two full-member teams
+    # you don't follow) — but not associate-vs-associate minnow games, and not
+    # for the stricter followed/premier floors.
     return (
         prefs.tier_floor >= Tier.HOME_DOMESTIC
         and match.phase.is_active_today
         and match.format.is_international
+        and _involves_full_member(match)
     )
 
 
