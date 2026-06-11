@@ -249,6 +249,21 @@ def test_espn_dismissals_from_matchcards(settings):
     assert dis == {(2, "p1"): "caught wk", (2, "p2"): "not out"}  # batting card only
 
 
+def test_espn_partnerships_from_matchcards(settings):
+    src = EspnSource(settings)
+    p = src._partnerships({"matchcards": [
+        {"headline": "Partnerships", "inningsNumber": "2", "playerDetails": [
+            {"partnershipWicketName": "1st", "partnershipRuns": "0", "partnershipOvers": "0.2",
+             "player1Name": "Sarkar", "player2Name": "Hasan"},
+            {"partnershipWicketName": "2nd", "partnershipRuns": "86", "partnershipOvers": "15.3",
+             "player1Name": "Sarkar", "player2Name": "Shanto"},
+        ]},
+        {"headline": "Batting", "inningsNumber": "2", "playerDetails": []},
+    ]})
+    assert list(p) == [2]
+    assert p[2][1].runs == 86 and p[2][1].wicket == "2nd" and p[2][1].batter2 == "Shanto"
+
+
 def test_espn_match_info_toss_and_officials(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

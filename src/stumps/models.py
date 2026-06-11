@@ -145,6 +145,15 @@ class Ball:
 
 
 @dataclass
+class Partnership:
+    wicket: str  # "1st", "2nd", …
+    runs: int = 0
+    overs: str = ""
+    batter1: str = ""
+    batter2: str = ""
+
+
+@dataclass
 class Innings:
     batting_team: str
     bowling_team: str = ""
@@ -159,6 +168,7 @@ class Innings:
     extras: int = 0
     batters: list[Batter] = field(default_factory=list)
     bowlers: list[Bowler] = field(default_factory=list)
+    partnerships: list[Partnership] = field(default_factory=list)
 
     @property
     def score(self) -> str:

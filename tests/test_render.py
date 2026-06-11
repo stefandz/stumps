@@ -197,6 +197,20 @@ def test_match_detail_shows_full_scorecard():
     assert "England won by 20 runs" in out
 
 
+def test_match_detail_shows_partnerships():
+    from stumps.models import Innings, Match, Partnership, Team
+    from stumps.render.console import render_match_detail
+    m = Match("p", Format.ODI, [Team("A"), Team("B")], phase=Phase.COMPLETE,
+              status_text="A won",
+              innings=[Innings("A", "B", 1, 195, 5, 35.0, partnerships=[
+                  Partnership("1st", 0, "0.2", "Sarkar", "Hasan"),
+                  Partnership("2nd", 86, "15.3", "Sarkar", "Shanto")])])
+    c = Console(width=80, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "Partnerships" in out and "Sarkar & Shanto" in out and "86" in out
+
+
 def test_match_detail_shows_toss_and_officials():
     from stumps.models import Match, Team
     from stumps.render.console import render_match_detail

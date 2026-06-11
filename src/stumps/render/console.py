@@ -485,6 +485,18 @@ def _compact_line(match: Match, cls: Classification) -> Text:
     return line
 
 
+def _partnerships_table(inns) -> Table | None:
+    if not inns.partnerships:
+        return None
+    t = _figures_table("Partnerships")
+    t.add_column("R", justify="right")
+    t.add_column("Overs", justify="right")
+    for p in inns.partnerships:
+        pair = " & ".join(x for x in (p.batter1, p.batter2) if x)
+        t.add_row(f"{p.wicket}  {pair}".strip(), str(p.runs), p.overs)
+    return t
+
+
 def _standings_panel(standings: Standings, accent: str) -> Panel:
     rows = standings.rows
     # Multi-day tables have draws; limited-overs tables have a net run rate (and
@@ -657,6 +669,9 @@ def render_match_detail(
         bowl = _bowling_table(inns, full=True)
         if bowl is not None:
             body.append(bowl)
+        pship = _partnerships_table(inns)
+        if pship is not None:
+            body.append(pship)
 
     if match.phase.is_active_today:
         if prefs.show_dls:

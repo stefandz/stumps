@@ -196,7 +196,8 @@ sources/* ── Match objects ──> prioritise ──> render
   degrades to a muted "No score yet"/"Yet to start" line rather than an empty
   frame. `--match TEXT` (substring of team/series) drills into one match via
   `render_match_detail` — the full scorecard (every innings, all batters with
-  how-out, all bowlers; the figure tables take a `full=True` mode).
+  how-out, all bowlers; the figure tables take a `full=True` mode), plus
+  partnerships (latest innings, from `matchcards`), the toss and the umpires.
   **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
   fetch (`lookback_days=prefs.results_days`) → prioritise → enrich (active matches
