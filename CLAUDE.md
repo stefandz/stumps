@@ -30,7 +30,10 @@ pytest tests/test_winprob.py -k heuristic   # one pattern
 
 There is no network in the test suite — sources are tested via fixtures and
 monkeypatched failures, so `pytest` is fast and offline. Prefer `stumps --demo`
-over live runs while developing UI/logic.
+over live runs while developing UI/logic. To turn a live match into offline
+fixtures (e.g. snapshot a real Test across its days), use
+`python scripts/capture_test_fixtures.py "<team v team>" <label>` — it dumps the
+scoreboard event + summary + commentary to `tests/fixtures/espn/<label>.json`.
 
 ## Architecture (the big picture)
 
