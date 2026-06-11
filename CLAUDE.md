@@ -67,7 +67,11 @@ sources/* ── Match objects ──> prioritise ──> render
     impersonation, so don't try to "simplify" back to httpx/that endpoint. The
     list comes from the scoreboard header; figures + structured innings
     (`linescores` with target) come from the per-event `summary` endpoint, used
-    to `enrich()` active matches (and finished multi-day ones). The header also
+    to `enrich()` active matches (and finished multi-day ones). Batters are
+    ordered by `battingPosition`; how-out text is the dismissal *mode* ("caught
+    wk", "bowled", …) from the `matchcards` scorecard (latest innings only) with
+    a fallback to the roster `dismissalCard` abbreviation (`_expand_card`) — the
+    full "c Fielder b Bowler" isn't in the summary (it'd need commentary). The header also
     accepts `&dates=YYYYMMDD` (one date, **no ranges**), so `fetch_recent_results`
     makes one cached call per past day and stamps finished games with
     `Match.finished_on` (most-recent date wins) — the renderer turns that into a

@@ -223,6 +223,32 @@ def test_espn_points_from_notes(settings):
     assert m2.points == ""
 
 
+def test_espn_dismissal_card_expansion():
+    from stumps.sources.espn import _expand_card
+    assert _expand_card("c", 0) == "caught"
+    assert _expand_card("c", 1) == "caught wk"   # fielderKeeper -> behind
+    assert _expand_card("b", 0) == "bowled"
+    assert _expand_card("lbw", 0) == "lbw"
+    assert _expand_card("run out", 0) == "run out"
+    assert _expand_card("st", 0) == "stumped"
+    # Empties / not-out are handled via the `outs` stat, not the card.
+    assert _expand_card("", 0) == "" and _expand_card("0", 0) == ""
+    assert _expand_card("not out", 0) == ""
+
+
+def test_espn_dismissals_from_matchcards(settings):
+    src = EspnSource(settings)
+    dis = src._dismissals({"matchcards": [
+        {"headline": "Batting", "inningsNumber": "2", "playerDetails": [
+            {"playerID": "p1", "dismissal": "caught wk"},
+            {"playerID": "p2", "dismissal": "not out"},
+        ]},
+        {"headline": "Bowling", "inningsNumber": "2",
+         "playerDetails": [{"playerID": "x", "dismissal": ""}]},
+    ]})
+    assert dis == {(2, "p1"): "caught wk", (2, "p2"): "not out"}  # batting card only
+
+
 def test_espn_standings_from_summary(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

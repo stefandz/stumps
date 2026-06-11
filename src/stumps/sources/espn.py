@@ -38,6 +38,24 @@ _PLAYBYPLAY = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/8676/pl
 _INTL_CLASS = {1: Format.TEST, 2: Format.ODI, 3: Format.T20I,
                10: Format.WT20I, 11: Format.WODI, 12: Format.WTEST}
 
+# Roster `dismissalCard` abbreviation -> readable how-out mode.
+_DISMISSAL_CARDS = {
+    "c": "caught", "b": "bowled", "lbw": "lbw", "run out": "run out",
+    "st": "stumped", "c & b": "caught & bowled", "hit wicket": "hit wicket",
+}
+
+
+def _expand_card(card: Any, fielder_keeper: int) -> str:
+    """Readable how-out from the roster `dismissalCard` abbreviation; '' when the
+    feed gives nothing (not-out is handled separately via the `outs` stat)."""
+    text = str(card or "").strip().lower()
+    if not text or text in ("0", "not out"):
+        return ""
+    text = _DISMISSAL_CARDS.get(text, text)
+    if text == "caught" and fielder_keeper:
+        text = "caught wk"
+    return text
+
 
 def _to_int(v: Any, default: int = 0) -> int:
     try:
@@ -438,6 +456,7 @@ class EspnSource(DataSource):
                     if period not in by_period or _to_int(ls.get("runs")) >= _to_int(by_period[period][1].get("runs")):
                         by_period[period] = (c, ls)
 
+        dismissals = self._dismissals(data)
         innings = []
         for period in sorted(by_period):
             comp_c, ls = by_period[period]
@@ -456,7 +475,7 @@ class EspnSource(DataSource):
                 target=target,
                 all_out=wkts >= 10,
                 closed=not is_current,
-                batters=self._batters(rosters, team_name, period),
+                batters=self._batters(rosters, team_name, period, dismissals),
                 bowlers=self._bowlers(rosters, team_name, period),
             )
             innings.append(inns)
@@ -476,29 +495,37 @@ class EspnSource(DataSource):
                         return flat
         return {}
 
-    def _batters(self, rosters: list[dict], team_name: str, period: int) -> list[Batter]:
+    def _batters(self, rosters: list[dict], team_name: str, period: int,
+                 dismissals: dict[tuple[int, str], str]) -> list[Batter]:
         roster = _find_roster(rosters, team_name)
-        out = []
+        ranked: list[tuple[int, Batter]] = []
         for entry in roster:
             st = self._period_stats(entry, period)
             if not st or "ballsFaced" not in st:
                 continue
             if _to_int(st.get("batted")) != 1 and _to_int(st.get("ballsFaced")) == 0:
                 continue
-            name = _dig(entry, "athlete", "displayName") or "?"
-            dismissal = _dig(self._batting_block(entry, period), "shortText")
-            out.append(Batter(
-                name=name,
+            pid = str(_dig(entry, "athlete", "id") or "")
+            # How-out: the `matchcards` scorecard has full text but only for the
+            # latest innings, so fall back to the roster `dismissalCard` (present
+            # every innings), then to a bare "out" for a dismissed batter.
+            how = dismissals.get((period, pid)) or _expand_card(
+                st.get("dismissalCard"), _to_int(st.get("fielderKeeper")))
+            dismissed = _to_int(st.get("outs")) > 0
+            batter = Batter(
+                name=_dig(entry, "athlete", "displayName") or "?",
                 runs=_to_int(st.get("runs")),
                 balls=_to_int(st.get("ballsFaced")),
                 fours=_to_int(st.get("fours")),
                 sixes=_to_int(st.get("sixes")),
-                not_out=_to_int(st.get("outs")) == 0,
-                dismissal=dismissal if _to_int(st.get("outs")) else None,
+                not_out=not dismissed,
+                dismissal=(how or "out") if dismissed else None,
                 on_strike=bool(entry.get("active")),
-            ))
-        out.sort(key=lambda b: (b.not_out is False, ))  # not-out batters first
-        return out
+            )
+            ranked.append((_to_int(st.get("battingPosition")) or 99, batter))
+        # Real batting order, not not-out-first.
+        ranked.sort(key=lambda t: t[0])
+        return [b for _, b in ranked]
 
     def _bowlers(self, rosters: list[dict], batting_team: str, period: int) -> list[Bowler]:
         # Bowlers come from the team that ISN'T batting this innings.
@@ -523,13 +550,20 @@ class EspnSource(DataSource):
         return out
 
     @staticmethod
-    def _batting_block(entry: dict, period: int) -> dict:
-        for ls in entry.get("linescores") or []:
-            if _to_int(ls.get("period")) == period:
-                for inner in ls.get("linescores") or []:
-                    if inner.get("batting"):
-                        return inner["batting"]
-        return {}
+    def _dismissals(data: dict) -> dict[tuple[int, str], str]:
+        """(innings number, player id) -> how-out text from the `matchcards`
+        scorecard ("caught", "bowled", "lbw", "caught wk", "not out", …)."""
+        out: dict[tuple[int, str], str] = {}
+        for card in data.get("matchcards") or []:
+            if (card.get("headline") or "").lower() != "batting":
+                continue
+            inns = _to_int(card.get("inningsNumber"))
+            for p in card.get("playerDetails") or []:
+                pid = str(p.get("playerID") or "")
+                text = (p.get("dismissal") or "").strip()
+                if pid and text:
+                    out[(inns, pid)] = text
+        return out
 
 
 def _find_roster(rosters: list[dict], team_name: str) -> list[dict]:
