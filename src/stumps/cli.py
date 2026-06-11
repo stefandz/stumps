@@ -27,8 +27,9 @@ from stumps import completion
 from stumps.config import load_config_file, load_settings
 from stumps.models import Phase
 from stumps.options import Preferences
-from stumps.prioritise import prioritise
+from stumps.prioritise import classify, prioritise
 from stumps.render import render_report
+from stumps.render.console import render_match_detail
 from stumps.render.json_out import render_json
 from stumps.sources.aggregator import Aggregator
 from stumps.sources.base import SourceError
@@ -81,6 +82,9 @@ def _show_parser() -> argparse.ArgumentParser:
                    help="treat World Cup warm-ups/qualifiers as premier")
     b.add_argument("--limit", type=int, default=None,
                    help="cap the number of matches shown")
+    b.add_argument("--match", metavar="TEXT",
+                   help="drill into a single match (substring of team/series) "
+                        "and show its full scorecard")
     b.add_argument("--results", type=int, metavar="DAYS", default=None,
                    help="include finished results from the last DAYS days for "
                         "followed/domestic/premier matches (default 1)")
@@ -150,8 +154,27 @@ def _run_show(args: argparse.Namespace) -> int:
     agg = Aggregator(settings, demo_only=args.demo)
     notify_state: dict = {}
 
+    def run_detail(result, query: str) -> None:
+        q = query.lower()
+        found = next(
+            (m for m in result.matches
+             if q in m.title.lower() or q in m.series_name.lower()), None)
+        if found is None:
+            console.print(f"[dim]No match found for {query!r}.[/dim]")
+            return
+        if not args.no_enrich:
+            agg.enrich(result, [found])
+        cls = classify(found, prefs)
+        if prefs.json_output:
+            print(render_json(result, [(found, cls)], settings, prefs))
+        else:
+            render_match_detail(console, found, cls, settings, prefs)
+
     def run_once() -> None:
         result = agg.fetch(lookback_days=prefs.results_days)
+        if prefs.match_query:
+            run_detail(result, prefs.match_query)
+            return
         ranked = prioritise(result.matches, prefs)
         if not args.no_enrich:
             # Fetch detailed scorecards for matches we'll show figures for (live /

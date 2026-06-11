@@ -24,14 +24,15 @@ Answer "where's my team in the table?".
   table per distinct competition shown (`_standings_panel`). Generic across
   county championship and the first-class / limited-overs leagues worldwide.
 
-## 3. Single-match detail / drill-down
+## 3. Single-match detail / drill-down — DONE
 
-`stumps --match <id>` showing the full scorecard — every batter/bowler, fall of
-wickets, partnerships, more commentary.
+`stumps --match TEXT` (substring of team/series — friendlier than an opaque id)
+shows the full scorecard: every innings, every batter with how-out, every
+bowler, plus headline/points/DLS/win-prob/recent balls. `render_match_detail`
+in `render/console.py`; `_batting_table`/`_bowling_table` gained a `full=True`
+mode. Works with `--json` too (emits just that match).
 
-- The `summary` endpoint already returns `rosters` / `leaders` / `matchcards`.
-- The natural "tap in for more" from the ranked list. Biggest scope, most
-  "wow". Medium–high effort.
+Possible later: fall of wickets / partnerships (not parsed yet).
 
 ## 4. Status-line / one-liner mode
 

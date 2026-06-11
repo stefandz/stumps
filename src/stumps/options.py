@@ -42,6 +42,8 @@ class Preferences:
     include_all: bool = False
     tier_floor: int = 2  # show followed + premier + domestic by default
     limit: int | None = None
+    #: Drill into a single match (substring of title/series) with a full scorecard.
+    match_query: str | None = None
     #: How many past days of finished results to pull in (followed/domestic/
     #: premier only); 0 disables. Default surfaces yesterday's results.
     results_days: int = 1
@@ -110,6 +112,7 @@ class Preferences:
         if prefs.include_all:
             prefs.tier_floor = TIER_FLOORS["all"]
         prefs.limit = getattr(args, "limit", None)
+        prefs.match_query = getattr(args, "match", None)
 
         prefs.compact = getattr(args, "compact", False)
         prefs.show_figures = not getattr(args, "no_figures", False)

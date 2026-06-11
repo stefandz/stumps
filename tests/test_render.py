@@ -161,6 +161,31 @@ def test_drawn_multiday_panel_shows_match_drawn():
     assert "RESULT" in out  # the ✓ RESULT badge
 
 
+def test_match_detail_shows_full_scorecard():
+    from stumps.models import Batter, Bowler, Innings, Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("d", Format.ODI, [Team("England"), Team("India")],
+              phase=Phase.COMPLETE, winner="England",
+              status_text="England won by 20 runs",
+              result_text="England won by 20 runs",
+              innings=[Innings(
+                  "England", "India", 1, 300, 10, 50.0, all_out=True,
+                  batters=[
+                      Batter("A Cook", 100, 90, 10, 2, not_out=False, dismissal="c Kohli b Shami"),
+                      Batter("J Root", 50, 40, 5, 0, not_out=True),
+                  ],
+                  bowlers=[Bowler("M Shami", 10.0, 1, 55, 3), Bowler("J Bumrah", 10.0, 0, 60, 2)],
+              )])
+    c = Console(width=90, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "1st innings" in out and "how out" in out
+    # Every batter (not just the top two) and their dismissal show.
+    assert "A Cook" in out and "J Root" in out and "c Kohli b Shami" in out
+    assert "J Bumrah" in out  # all bowlers too
+    assert "England won by 20 runs" in out
+
+
 def test_standings_panel_renders():
     from rich.console import Console
     from stumps.models import Standings, StandingsRow

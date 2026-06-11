@@ -150,25 +150,33 @@ def _figures_table(section: str) -> Table:
     return t
 
 
-def _batting_table(inns) -> Table | None:
-    active = [b for b in inns.batters if b.not_out] or inns.batters[:2]
-    if not active:
+def _batting_table(inns, *, full: bool = False) -> Table | None:
+    batters = inns.batters if full else (
+        [b for b in inns.batters if b.not_out] or inns.batters[:2])
+    if not batters:
         return None
     t = _figures_table("Batting")
     t.add_column("R", justify="right")  # runs
     t.add_column("B", justify="right")  # balls faced
     t.add_column("4s/6s", justify="right")
     t.add_column("SR", justify="right")  # strike rate
-    for b in active:
-        name = Text(b.name + (" *" if b.on_strike else ""),
+    if full:
+        t.add_column("how out", style="dim")
+    for b in batters:
+        starred = b.on_strike or (full and b.not_out)
+        name = Text(b.name + (" *" if starred else ""),
                     style="bold" if b.on_strike else "")
-        t.add_row(name, str(b.runs), str(b.balls), f"{b.fours}/{b.sixes}",
-                  f"{b.strike_rate:.0f}")
+        row = [name, str(b.runs), str(b.balls), f"{b.fours}/{b.sixes}",
+               f"{b.strike_rate:.0f}"]
+        if full:
+            row.append(b.dismissal or ("not out" if b.not_out else ""))
+        t.add_row(*row)
     return t
 
 
-def _bowling_table(inns) -> Table | None:
-    bowlers = [b for b in inns.bowlers if b.bowling_now] or inns.bowlers[:2]
+def _bowling_table(inns, *, full: bool = False) -> Table | None:
+    bowlers = inns.bowlers if full else (
+        [b for b in inns.bowlers if b.bowling_now] or inns.bowlers[:2])
     if not bowlers:
         return None
     t = _figures_table("Bowling")
@@ -508,6 +516,70 @@ def _match_panel(
         border_style=accent,
         padding=(0, 1),
     )
+
+
+_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}
+
+
+def render_match_detail(
+    console: Console, match: Match, cls: Classification, settings,
+    prefs: Preferences,
+) -> None:
+    """Full drill-down for a single match: the whole scorecard, innings by
+    innings (every batter with how-out + every bowler), plus the usual headline,
+    points, DLS, win probability and recent balls."""
+    accent = _accent(match, cls)
+    body: list = []
+
+    headline = _headline(match)
+    if headline and headline.strip().lower() not in _GENERIC_STATUS:
+        body.append(Text(headline, style="bold"))
+    if match.phase is Phase.COMPLETE and match.points:
+        pts = Text()
+        pts.append("Points  ", style="bold")
+        pts.append(match.points, style="dim")
+        body.append(pts)
+
+    for inns in match.innings:
+        body.append(Text(""))  # spacer between innings
+        head = Text(f"{_ORDINALS.get(inns.number, str(inns.number))} innings — "
+                    f"{inns.batting_team} {inns.score}", style=f"bold {accent}")
+        if inns.overs and not inns.all_out:
+            head.append(f"  ({inns.overs:.1f} ov)", style="dim")
+        body.append(head)
+        bat = _batting_table(inns, full=True)
+        if bat is not None:
+            body.append(bat)
+        bowl = _bowling_table(inns, full=True)
+        if bowl is not None:
+            body.append(bowl)
+
+    if match.phase.is_active_today:
+        if prefs.show_dls:
+            dls_line = _dls_line(match)
+            if dls_line is not None:
+                body.append(Text(""))
+                body.append(dls_line)
+        if prefs.show_winprob:
+            est = estimate(match, settings,
+                           use_multiday_model=prefs.use_multiday_model)
+            if est is not None:
+                body.append(_winprob_block(est, accent))
+    if prefs.show_commentary:
+        recent = _recent_balls_block(match, prefs.balls)
+        if recent is not None:
+            body.append(recent)
+
+    if not body:
+        body.append(Text("No score yet", style="dim italic"))
+
+    title = Text()
+    title.append(_phase_badge(match))
+    title.append("  ")
+    title.append(match.title, style=f"bold {accent}")
+    console.print(Panel(Group(*body), title=title, title_align="left",
+                        subtitle=_subtitle(match), subtitle_align="left",
+                        border_style=accent, padding=(0, 1)))
 
 
 def render_report(

@@ -176,7 +176,11 @@ sources/* ── Match objects ──> prioritise ──> render
   headline. The panel/title/border accent is the tier colour, except a **finished
   match is always framed green** (`_accent` → `_COMPLETE_ACCENT`), matching its
   ✓ RESULT badge. A match listed with no scorecard yet (just a toss, or feed lag)
-  degrades to a muted "No score yet"/"Yet to start" line rather than an empty frame. **`render/json_out.py`** is the `--json` path (stable schema for
+  degrades to a muted "No score yet"/"Yet to start" line rather than an empty
+  frame. `--match TEXT` (substring of team/series) drills into one match via
+  `render_match_detail` — the full scorecard (every innings, all batters with
+  how-out, all bowlers; the figure tables take a `full=True` mode).
+  **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
   fetch (`lookback_days=prefs.results_days`) → prioritise → enrich (active matches
   *and finished multi-day games*, to respect rate limits) → render (console or
