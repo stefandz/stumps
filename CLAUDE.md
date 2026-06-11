@@ -197,8 +197,9 @@ sources/* ── Match objects ──> prioritise ──> render
   frame. `--match TEXT` (substring of team/series) drills into one match via
   `render_match_detail` — the full scorecard (every innings, all batters with
   how-out, all bowlers; the figure tables take a `full=True` mode), plus
-  partnerships (every innings, from each innings' linescore `partnerships`), the
-  toss and the umpires.
+  partnerships (every innings, from each innings' linescore `partnerships`,
+  rendered as a back-to-back bar of each batter's runs on a shared centre line),
+  the toss and the umpires.
   **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
   fetch (`lookback_days=prefs.results_days`) → prioritise → enrich (active matches

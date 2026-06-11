@@ -383,13 +383,19 @@ class EspnSource(DataSource):
         (present for *every* innings, unlike the `matchcards` card)."""
         out = []
         for p in ls.get("partnerships") or []:
-            names = [_dig(b, "athlete", "displayName") or "" for b in p.get("batsmen") or []]
+            batsmen = p.get("batsmen") or []
+
+            def field(i: int, key: str):
+                return batsmen[i].get(key) if i < len(batsmen) else None
+
             out.append(Partnership(
                 wicket=p.get("wicketName") or "",
                 runs=_to_int(p.get("runs")),
                 overs=str(p.get("overs") or ""),
-                batter1=names[0] if len(names) > 0 else "",
-                batter2=names[1] if len(names) > 1 else "",
+                batter1=_dig(batsmen[0], "athlete", "displayName") or "" if batsmen else "",
+                batter2=_dig(batsmen[1], "athlete", "displayName") or "" if len(batsmen) > 1 else "",
+                runs1=_to_int(field(0, "runs")),
+                runs2=_to_int(field(1, "runs")),
             ))
         return out
 

@@ -151,6 +151,8 @@ class Partnership:
     overs: str = ""
     batter1: str = ""
     batter2: str = ""
+    runs1: int = 0  # batter1's contribution
+    runs2: int = 0  # batter2's contribution
 
 
 @dataclass

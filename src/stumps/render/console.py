@@ -485,16 +485,42 @@ def _compact_line(match: Match, cls: Classification) -> Text:
     return line
 
 
-def _partnerships_table(inns) -> Table | None:
+#: Colours for the two batters in a partnership's diverging bar.
+_PARTNERSHIP_LEFT = "cyan"
+_PARTNERSHIP_RIGHT = "magenta"
+
+
+def _partnerships_block(inns, half: int = 12) -> Group | None:
+    """Partnerships as a back-to-back bar: batter 1's runs grow left of a shared
+    centre line, batter 2's grow right, scaled to the biggest contribution so
+    the centre line aligns across every row."""
     if not inns.partnerships:
         return None
-    t = _figures_table("Partnerships")
-    t.add_column("R", justify="right")
-    t.add_column("Overs", justify="right")
+
+    def label(name: str, runs: int) -> str:
+        # Surname only, to keep the bar compact and avoid wrapping.
+        return f"{name.split()[-1] if name else '?'} {runs}"
+
+    peak = max((max(p.runs1, p.runs2) for p in inns.partnerships), default=0) or 1
+    lw = max(len(label(p.batter1, p.runs1)) for p in inns.partnerships)
+    rw = max(len(label(p.batter2, p.runs2)) for p in inns.partnerships)
+
+    rows: list = [Text("Partnerships", style="bold dim")]
     for p in inns.partnerships:
-        pair = " & ".join(x for x in (p.batter1, p.batter2) if x)
-        t.add_row(f"{p.wicket}  {pair}".strip(), str(p.runs), p.overs)
-    return t
+        left = round(p.runs1 / peak * half)
+        right = round(p.runs2 / peak * half)
+        line = Text()
+        line.append(f"{p.wicket:>4}  ", style="bold")
+        line.append(f"{p.runs:>3} ({p.overs:>4})  ", style="dim")
+        line.append(label(p.batter1, p.runs1).rjust(lw) + " ")
+        line.append(" " * (half - left))
+        line.append("█" * left, style=_PARTNERSHIP_LEFT)
+        line.append("│", style="dim")
+        line.append("█" * right, style=_PARTNERSHIP_RIGHT)
+        line.append(" " * (half - right))
+        line.append(" " + label(p.batter2, p.runs2).ljust(rw))
+        rows.append(line)
+    return Group(*rows)
 
 
 def _standings_panel(standings: Standings, accent: str) -> Panel:
@@ -669,7 +695,7 @@ def render_match_detail(
         bowl = _bowling_table(inns, full=True)
         if bowl is not None:
             body.append(bowl)
-        pship = _partnerships_table(inns)
+        pship = _partnerships_block(inns)
         if pship is not None:
             body.append(pship)
 

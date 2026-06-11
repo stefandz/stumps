@@ -203,12 +203,14 @@ def test_match_detail_shows_partnerships():
     m = Match("p", Format.ODI, [Team("A"), Team("B")], phase=Phase.COMPLETE,
               status_text="A won",
               innings=[Innings("A", "B", 1, 195, 5, 35.0, partnerships=[
-                  Partnership("1st", 0, "0.2", "Sarkar", "Hasan"),
-                  Partnership("2nd", 86, "15.3", "Sarkar", "Shanto")])])
-    c = Console(width=80, record=True)
+                  Partnership("1st", 0, "0.2", "Sarkar", "Hasan", runs1=0, runs2=0),
+                  Partnership("2nd", 86, "15.3", "Sarkar", "Shanto", runs1=39, runs2=45)])])
+    c = Console(width=100, record=True)
     render_match_detail(c, m, classify(m), _settings(), Preferences())
     out = c.export_text()
-    assert "Partnerships" in out and "Sarkar & Shanto" in out and "86" in out
+    assert "Partnerships" in out and "86" in out
+    # Per-batter runs and the diverging bar's centre line.
+    assert "Sarkar 39" in out and "Shanto 45" in out and "│" in out
 
 
 def test_match_detail_shows_toss_and_officials():
