@@ -124,19 +124,41 @@ def test_synth_result_skips_dls():
     assert _synth_result(m2) is None
 
 
-def test_synth_result_skips_multi_day():
+def _completed_test(winner="", status="Result"):
     from stumps.models import Innings, Match, Team
-    m = Match(
+    return Match(
         match_id="td", format=Format.TEST, phase=Phase.COMPLETE,
-        teams=[Team("Eng", "ENG"), Team("Aus", "AUS")], status_text="Result",
+        teams=[Team("England", "ENG"), Team("Australia", "AUS")],
+        status_text=status, winner=winner,
         innings=[
-            Innings("Eng", "Aus", 1, 400, 10, 120.0, all_out=True, closed=True),
-            Innings("Aus", "Eng", 2, 300, 10, 100.0, all_out=True, closed=True),
-            Innings("Eng", "Aus", 3, 250, 8, 70.0, declared=True, closed=True),
-            Innings("Aus", "Eng", 4, 200, 5, 60.0, target=351, closed=True),
+            Innings("England", "Australia", 1, 400, 10, 120.0, all_out=True, closed=True),
+            Innings("Australia", "England", 2, 300, 10, 100.0, all_out=True, closed=True),
+            Innings("England", "Australia", 3, 250, 8, 70.0, declared=True, closed=True),
+            Innings("Australia", "England", 4, 200, 5, 60.0, target=351, closed=True),
         ],
     )
-    assert _synth_result(m) is None  # draw vs win isn't derivable from scores
+
+
+def test_synth_result_multiday_draw():
+    # A finished multi-day game with no winner flag is a draw.
+    assert _synth_result(_completed_test(winner="")) == "Match drawn"
+
+
+def test_synth_result_multiday_win_from_winner_flag():
+    assert _synth_result(_completed_test(winner="England")) == "England won"
+
+
+def test_completed_match_gets_green_accent():
+    from stumps.render.console import _COMPLETE_ACCENT, _accent
+    m = _completed_test(winner="England")
+    # Border/title accent is green for a finished game, whatever its tier.
+    assert _accent(m, classify(m)) == _COMPLETE_ACCENT
+
+
+def test_drawn_multiday_panel_shows_match_drawn():
+    out = _render(_completed_test(winner=""), _settings())
+    assert "Match drawn" in out
+    assert "RESULT" in out  # the ✓ RESULT badge
 
 
 def test_break_badge_names_the_interval():

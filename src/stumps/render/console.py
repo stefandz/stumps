@@ -40,6 +40,16 @@ _TIER_ACCENT = {
     Tier.OTHER: "white",
 }
 
+#: A finished match gets a green frame (matching its ✓ RESULT badge) regardless
+#: of tier — "this is settled" reads more usefully here than the tier colour.
+_COMPLETE_ACCENT = "green4"
+
+
+def _accent(match: Match, cls: Classification) -> str:
+    if match.phase is Phase.COMPLETE:
+        return _COMPLETE_ACCENT
+    return _TIER_ACCENT.get(cls.tier, "white")
+
 #: Bare state labels that the phase badge already conveys — never worth showing
 #: as a headline (e.g. a finished game whose only status text is "Result"). The
 #: break labels live here too because the BREAK badge now names the interval
@@ -249,15 +259,20 @@ def _headline(match: Match) -> str:
 
 
 def _synth_result(match: Match) -> str | None:
-    """Best-effort result line for a finished limited-overs match when the feed
-    gave us no usable text (just "Result"/"Final"). Deliberately conservative:
-    skipped for multi-day games (a draw isn't derivable from scores) and for
-    D/L-affected ones (the visible totals would yield a wrong margin).
+    """Best-effort result line for a finished match when the feed gave us no
+    usable text (just "Result"/"Final").
 
-    With a target on the second innings we know who batted when and can give the
-    full margin ("won by N runs/wickets"). Without one we can't tell who batted
-    first, so the *type* of margin is ambiguous — we name the winner from the
-    totals (unambiguous for a non-D/L game) but leave the margin off."""
+    Multi-day games lean on the feed's authoritative `winner` flag (a finished
+    game with no winner is a draw); deriving the margin from scores is left off,
+    since the full innings list carries it. Limited-overs games are derived from
+    the chase: with a target we give the full margin ("won by N runs/wickets");
+    D/L-affected ones are skipped (the visible totals would mislead)."""
+    if match.format.is_multi_day:
+        if not match.innings:
+            return None
+        if match.winner:
+            return f"{match.winner} won"
+        return "Match drawn"
     if not match.format.is_limited_overs or len(match.innings) < 2:
         return None
     blob = f"{match.status_text} {match.result_text}".lower()
@@ -368,7 +383,7 @@ def _winprob_block(est: WinEstimate, accent: str) -> Group:
 
 def _compact_line(match: Match, cls: Classification) -> Text:
     """One-line-per-match summary for --compact."""
-    accent = _TIER_ACCENT.get(cls.tier, "white")
+    accent = _accent(match, cls)
     label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
     line = Text()
     line.append(f"{label:<11}", style=style)
@@ -392,7 +407,7 @@ def _compact_line(match: Match, cls: Classification) -> Text:
 def _match_panel(
     match: Match, cls: Classification, settings, prefs: Preferences
 ) -> Panel:
-    accent = _TIER_ACCENT.get(cls.tier, "white")
+    accent = _accent(match, cls)
     body: list = []
 
     # Status headline — synthesised ("require 71 from 12.0 overs", "trail by 245") where we

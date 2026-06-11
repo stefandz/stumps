@@ -25,6 +25,7 @@ from rich.console import Console
 
 from stumps import completion
 from stumps.config import load_config_file, load_settings
+from stumps.models import Phase
 from stumps.options import Preferences
 from stumps.prioritise import prioritise
 from stumps.render import render_report
@@ -142,10 +143,16 @@ def _run_show(args: argparse.Namespace) -> int:
         result = agg.fetch()
         ranked = prioritise(result.matches, prefs)
         if not args.no_enrich:
-            # Only fetch detailed scorecards for matches we'll show figures for
-            # (live / break / stumps). Finished and upcoming games don't need
-            # them, which also conserves the cricketdata.org daily quota.
-            agg.enrich(result, [m for m, _ in ranked if m.phase.is_active_today])
+            # Fetch detailed scorecards for matches we'll show figures for (live /
+            # break / stumps) and for finished multi-day games — whose scoreboard
+            # score string collapses to one innings per side ("421 & 259/5d"), so
+            # only enrichment recovers the full innings list. Upcoming and finished
+            # limited-overs games don't need it (conserving the cricketdata quota).
+            agg.enrich(result, [
+                m for m, _ in ranked
+                if m.phase.is_active_today
+                or (m.phase is Phase.COMPLETE and m.format.is_multi_day)
+            ])
         when = datetime.now().strftime("%a %d %b %Y, %H:%M")
         if prefs.json_output:
             print(render_json(result, ranked, settings, prefs, when=when))

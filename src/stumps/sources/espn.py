@@ -157,6 +157,9 @@ class EspnSource(DataSource):
             result = detail if detail.strip().lower() not in generic else status
             match.result_text = result
             match.status_text = result
+            # The authoritative win/draw signal: each competitor carries a
+            # `winner` boolean. No winner on a finished game -> drawn / tied.
+            match.winner = self._winner_name(event.get("competitors") or [])
         match.day_number, match.total_days = _parse_day(status)
         match.ball_by_ball_available = bool(event.get("playByPlayAvailable"))
         return match
@@ -237,6 +240,16 @@ class EspnSource(DataSource):
         if match.ball_by_ball_available and match.phase.is_active_today:
             match.recent_balls = self._recent_balls(match.match_id)
         return match
+
+    @staticmethod
+    def _winner_name(competitors: list[dict]) -> str:
+        """The name of the competitor flagged `winner`, or '' (drawn/tied/none)."""
+        for c in competitors:
+            if c.get("winner"):
+                t = c.get("team") or {}
+                return (t.get("displayName") or t.get("name")
+                        or c.get("displayName") or c.get("name") or "")
+        return ""
 
     @staticmethod
     def _apply_multiday_timing(match: Match, data: dict) -> None:

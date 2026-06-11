@@ -189,6 +189,23 @@ def test_espn_completed_prefers_result_detail(settings):
     assert match.status_text == "England Women won by 5 runs"
 
 
+def test_espn_completed_captures_winner_flag(settings):
+    src = EspnSource(settings)
+    # A win: one competitor flagged winner.
+    won = _espn_event()
+    won["fullStatus"] = {"type": {"state": "post", "detail": "Final"}}
+    won["competitors"][0]["winner"] = True
+    m = src._event_to_match(won, "1", "Series")
+    assert m.phase is Phase.COMPLETE
+    assert m.winner == "Bangladesh"
+    # A draw: neither competitor flagged winner.
+    drawn = _espn_event()
+    drawn["fullStatus"] = {"type": {"state": "post", "detail": "Final"}}
+    for c in drawn["competitors"]:
+        c["winner"] = False
+    assert src._event_to_match(drawn, "1", "Series").winner == ""
+
+
 def test_espn_multiday_timing_from_notes(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

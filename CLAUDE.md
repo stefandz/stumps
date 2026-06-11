@@ -68,11 +68,16 @@ sources/* ── Match objects ──> prioritise ──> render
     (+ `generalClassCard`); phase from `fullStatus.type.state`. For a finished
     game the result text comes from `fullStatus.type.detail` ("X won by N runs",
     "Match drawn/tied"), *not* `summary` — which is often the bare label
-    "Result" (the renderer drops that via `_GENERIC_STATUS`). When the feed
-    leaves us nothing usable, `render.console._synth_result` reconstructs a
-    result *only* for the unambiguous limited-overs chase (the second innings
-    carries a `target`, so the margin is readable); it deliberately bails on
-    multi-day games (no draw signal) and D/L-affected ones (wrong margin).
+    "Result"/"Final" (the renderer drops those via `_GENERIC_STATUS`). The
+    authoritative win/draw signal is each competitor's **`winner` boolean**
+    (`_winner_name` → `Match.winner`; no winner on a finished game ⇒ a draw).
+    **Finished multi-day games are enriched too** (not just active ones): the
+    scoreboard score string collapses to one innings per side ("421 & 259/5d"),
+    so only the per-event summary's `linescores` recover the full innings list.
+    When the feed leaves no usable result text, `render.console._synth_result`
+    reconstructs one — multi-day from `Match.winner` ("X won", else "Match
+    drawn"; the full innings list carries the margin), limited-overs from the
+    chase ("won by N runs/wickets", skipping D/L where the totals would mislead).
 
 - **`options.py`** holds `Preferences` — the user-facing choices (followed
   teams, region, domestic scene, filters, display toggles, JSON) resolved from
@@ -136,11 +141,14 @@ sources/* ── Match objects ──> prioritise ──> render
   X.Y overs" (balls in the final over); a multi-day match in its fourth innings
   becomes "require N runs to win with W wickets remaining"
   (`_final_innings_target`), otherwise the lead/trail line; everything else falls
-  back to the source's own `status_text`. `--compact`
-  is one clipped line per match, leading with that headline. **`render/json_out.py`** is the
-  `--json` path (stable schema for scripts/widgets). `cli.py` parses args, builds
-  `Preferences`, and orchestrates fetch → prioritise → enrich(active matches
-  only, to respect rate limits) → render (console or JSON).
+  back to the source's own `status_text` (or a `_synth_result` fallback for
+  finished games). `--compact` is one clipped line per match, leading with that
+  headline. The panel/title/border accent is the tier colour, except a **finished
+  match is always framed green** (`_accent` → `_COMPLETE_ACCENT`), matching its
+  ✓ RESULT badge. **`render/json_out.py`** is the `--json` path (stable schema for
+  scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
+  fetch → prioritise → enrich (active matches *and finished multi-day games*, to
+  respect rate limits) → render (console or JSON).
 
 ## Conventions / gotchas
 
