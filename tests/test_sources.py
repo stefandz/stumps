@@ -127,6 +127,61 @@ def test_cricketdata_sets_start_time(settings):
     assert m.starts_at == "2026-06-20T14:00:00" and m.phase is Phase.UPCOMING
 
 
+def test_norm_name():
+    from stumps.sources.cricketdata import norm_name
+    assert norm_name("  Beth   Mooney ") == "beth mooney"
+    assert norm_name(None) == ""
+
+
+def test_cricketdata_dismissal_texts(settings, monkeypatch):
+    src = CricketDataSource(settings)
+    monkeypatch.setattr(src, "api_key", "k")  # make .available true
+
+    def fake_get(endpoint, params, ttl=None):
+        if endpoint == "currentMatches":
+            return {"data": [{"id": "X", "teams": ["Australia Women", "West Indies Women"],
+                              "dateTimeGMT": "2026-06-10T14:00:00"}]}
+        if endpoint == "match_scorecard":
+            assert params["id"] == "X"
+            return {"data": {"scorecard": [{"batting": [
+                {"batsman": {"name": "Qiana Joseph"}, "dismissal-text": "c Mooney b Hamilton"},
+                {"batsman": {"name": "Hayley Matthews"}, "dismissal-text": "not out"},
+            ]}]}}
+        return {"data": []}
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    texts = src.dismissal_texts(["West Indies Women", "Australia Women"],
+                                "2026-06-10T14:00:00Z")
+    assert texts == {"qiana joseph": "c Mooney b Hamilton"}  # not-out excluded
+
+
+def test_aggregator_augment_upgrades_dismissals(settings, monkeypatch):
+    from stumps.models import Batter, Format, Innings, Match, Phase, Team
+    agg = Aggregator(Settings(cache_dir=settings.cache_dir, cricketdata_api_key="k"))
+    cd = next(s for s in agg.sources if isinstance(s, CricketDataSource))
+    monkeypatch.setattr(cd, "dismissal_texts",
+                        lambda teams, date, *, scorecard_ttl=None:
+                        {"qiana joseph": "c Mooney b Hamilton"})
+    m = Match("m", Format.WT20I, [Team("Australia Women"), Team("West Indies Women")],
+              phase=Phase.COMPLETE,
+              innings=[Innings("West Indies Women", "Australia Women", 1, 120, 5, 20.0,
+                  batters=[Batter("Qiana Joseph", 5, 6, 1, 0, not_out=False, dismissal="caught wk"),
+                           Batter("Hayley Matthews", 40, 30, 5, 1, not_out=True)])])
+    agg.augment(m)
+    assert m.innings[0].batters[0].dismissal == "c Mooney b Hamilton"  # upgraded
+    assert m.innings[0].batters[1].dismissal is None  # not-out untouched
+
+
+def test_aggregator_augment_silent_without_key(settings):
+    from stumps.models import Batter, Format, Innings, Match, Phase, Team
+    agg = Aggregator(settings)  # no cricketdata key
+    m = Match("m", Format.WT20I, [Team("A"), Team("B")], phase=Phase.COMPLETE,
+              innings=[Innings("A", "B", 1, 5, 1, 1.0,
+                  batters=[Batter("X", 0, 1, 0, 0, not_out=False, dismissal="caught")])])
+    agg.augment(m)  # no key -> no-op, no error
+    assert m.innings[0].batters[0].dismissal == "caught"
+
+
 def test_cricketdata_requires_key(settings):
     src = CricketDataSource(settings)
     assert not src.available

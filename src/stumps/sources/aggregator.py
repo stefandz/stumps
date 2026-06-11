@@ -13,9 +13,9 @@ from datetime import datetime
 from pathlib import Path
 
 from stumps.config import Settings
-from stumps.models import Match
+from stumps.models import Match, Phase
 from stumps.sources.base import DataSource, SourceError
-from stumps.sources.cricketdata import CricketDataSource
+from stumps.sources.cricketdata import CricketDataSource, norm_name
 from stumps.sources.espn import EspnSource
 from stumps.sources.fixtures import DemoSource
 
@@ -119,6 +119,27 @@ class Aggregator:
             return data["matches"], as_of
         except Exception:
             return None
+
+    def augment(self, match: Match) -> None:
+        """Best-effort hybrid: upgrade ESPN's dismissal *mode* ("caught") to
+        cricketdata's full text ("c X b Y") in a single match's scorecard.
+
+        Silent on any failure (no key / quota / no match) — the primary data
+        stands. Aggressively cached, since a fallen wicket's text never changes:
+        a finished match's scorecard is held for a week, a live one for minutes."""
+        cd = next((s for s in self.sources if isinstance(s, CricketDataSource)), None)
+        if cd is None or not cd.available:
+            return
+        ttl = 7 * 24 * 3600 if match.phase is Phase.COMPLETE else 600
+        texts = cd.dismissal_texts(match.team_names, match.starts_at, scorecard_ttl=ttl)
+        if not texts:
+            return
+        for inns in match.innings:
+            for batter in inns.batters:
+                if batter.dismissal:  # ESPN gave a mode for a dismissed batter
+                    full = texts.get(norm_name(batter.name))
+                    if full:
+                        batter.dismissal = full
 
     @staticmethod
     def enrich(result: FetchResult, matches: list[Match]) -> None:

@@ -186,6 +186,9 @@ def _run_show(args: argparse.Namespace) -> int:
             return
         if not args.no_enrich:
             agg.enrich(result, [found])
+            # Hybrid: upgrade ESPN's dismissal mode to cricketdata's full
+            # "c X b Y" text where a key is set (silent if not / quota / no match).
+            agg.augment(found)
         cls = classify(found, prefs)
         if prefs.json_output:
             print(render_json(result, [(found, cls)], settings, prefs))

@@ -56,7 +56,13 @@ sources/* ── Match objects ──> prioritise ──> render
   `FetchResult`. **cricketdata.org is a deliberately-degraded backstop** — scores,
   status/result, start times, full scorecards (with full `dismissal-text`), but
   none of the ESPN-only extras (points/standings/partnerships/FoW/timing/recent
-  lookback/upcoming); those fields default safely and renderers guard on them. `fetch(lookback_days=N)` merges `fetch_recent_results(N)` into
+  lookback/upcoming); those fields default safely and renderers guard on them.
+  **Hybrid augmentation** runs the other way: `Aggregator.augment(match)` (called
+  from the `--match` path) upgrades ESPN's dismissal *mode* to cricketdata's full
+  "c X b Y" text (`CricketDataSource.dismissal_texts`, correlating the match by
+  teams+date). Best-effort/silent (no key / quota / no match → ESPN stands) and
+  cached hard (a finished card for a week — dismissals never change). `DiskCache.get`
+  takes a `ttl` override for this. `fetch(lookback_days=N)` merges `fetch_recent_results(N)` into
   the live list (deduped by id, live wins) so results that aged out of the live
   feed still show; `fetch(upcoming_days=N)` likewise merges `fetch_upcoming(N)`
   (future `&dates=` headers) so core teams' coming fixtures show with a local

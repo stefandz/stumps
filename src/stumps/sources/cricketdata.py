@@ -47,6 +47,11 @@ def _to_float(value: Any) -> float:
         return 0.0
 
 
+def norm_name(name: str) -> str:
+    """Normalise a player name for cross-source matching (lower, single-spaced)."""
+    return " ".join(str(name or "").lower().split())
+
+
 class CricketDataSource(DataSource):
     name = "cricketdata"
 
@@ -59,7 +64,7 @@ class CricketDataSource(DataSource):
     def available(self) -> bool:
         return bool(self.api_key)
 
-    def _get(self, endpoint: str, params: dict[str, Any]) -> dict:
+    def _get(self, endpoint: str, params: dict[str, Any], ttl: int | None = None) -> dict:
         if not self.api_key:
             raise SourceError(
                 "cricketdata.org needs an API key (set CRICKETDATA_API_KEY)"
@@ -68,7 +73,7 @@ class CricketDataSource(DataSource):
         # Cache key omits the apikey so it doesn't leak into filenames.
         cache_params = {k: v for k, v in params.items() if k != "apikey"}
         cache_key = f"cricketdata_{endpoint}_{sorted(cache_params.items())}"
-        cached = self.cache.get(cache_key)
+        cached = self.cache.get(cache_key, ttl=ttl)
         if cached is not None:
             return cached  # type: ignore[return-value]
 
@@ -122,6 +127,54 @@ class CricketDataSource(DataSource):
             if built:
                 match.innings = built
         return match
+
+    # -- augmentation (used to enrich a primary-source match) ---------------
+
+    def dismissal_texts(self, team_names: list[str], date_iso: str,
+                        *, scorecard_ttl: int | None = None) -> dict[str, str]:
+        """Map normalised batter name -> full dismissal text ("c X b Y") for the
+        cricketdata match matching ``team_names`` on ``date_iso``. Best-effort:
+        returns {} on a missing key, quota breach, network error, or no match —
+        so callers can augment when possible and silently skip otherwise."""
+        if not self.available:
+            return {}
+        try:
+            match_id = self._find_match_id(team_names, (date_iso or "")[:10])
+            if not match_id:
+                return {}
+            data = self._get("match_scorecard", {"id": match_id},
+                             ttl=scorecard_ttl).get("data") or {}
+            texts: dict[str, str] = {}
+            for card in data.get("scorecard") or []:
+                for b in card.get("batting") or []:
+                    name = (b.get("batsman") or {}).get("name") or ""
+                    text = (b.get("dismissal-text") or "").strip()
+                    if name and text and text.lower() not in {"not out", "batting"}:
+                        texts[norm_name(name)] = text
+            return texts
+        except Exception:
+            return {}
+
+    def _find_match_id(self, team_names: list[str], date: str) -> str:
+        """The cricketdata id of the match between ``team_names`` (fuzzy) on
+        ``date`` (YYYY-MM-DD), searching the current/recent window."""
+        wanted = [n.lower() for n in team_names if n]
+        if len(wanted) < 2:
+            return ""
+        for offset in (0, 25):
+            cm = self._get("currentMatches", {"offset": offset}).get("data") or []
+            for m in cm:
+                teams = [str(t).lower() for t in (m.get("teams") or [])]
+                if len(teams) < 2:
+                    continue
+                same_teams = all(
+                    any(w in t or t in w for t in teams) for w in wanted)
+                same_date = not date or str(m.get("dateTimeGMT") or "")[:10] == date
+                if same_teams and same_date:
+                    return str(m.get("id") or "")
+            if len(cm) < 25:
+                break  # last page reached
+        return ""
 
     # -- normalisers --------------------------------------------------------
 

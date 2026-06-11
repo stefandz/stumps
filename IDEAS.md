@@ -47,6 +47,12 @@ Mostly consolidation rather than new features — in rough priority order.
   isn't worth it for a source only hit when ESPN is down.
 - ~~**Two match-panel renderers duplicated.**~~ DONE: extracted `_labelled`,
   `_headline_line`, `_wrap_panel`.
+- ~~**Hybrid augmentation.**~~ DONE: with a cricketdata.org key, `--match`
+  upgrades ESPN's dismissal mode to cricketdata's full "c X b Y" text
+  (`Aggregator.augment`), silent + aggressively cached. (Probed cricketdata for
+  other richer fields — matchWinner/toss are redundant with ESPN, and there's no
+  FoW/partnerships/player-of-match/umpires in its payload, so dismissals are the
+  only worthwhile augmentation.)
 - **Config defaults for the newer toggles.** `results_days`/`upcoming_days` read
   from config; `notify`, `standings`, `core_results` don't. Wire them so they
   stick without flags.

@@ -74,11 +74,12 @@ class DiskCache:
         safe = "".join(c if c.isalnum() else "_" for c in key)
         return self.dir / f"cache_{safe}.json"
 
-    def get(self, key: str) -> object | None:
+    def get(self, key: str, ttl: int | None = None) -> object | None:
         path = self._path(key)
         if not path.exists():
             return None
-        if time.time() - path.stat().st_mtime > self.ttl:
+        max_age = self.ttl if ttl is None else ttl
+        if time.time() - path.stat().st_mtime > max_age:
             return None
         try:
             with path.open("r", encoding="utf-8") as fh:

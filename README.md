@@ -231,7 +231,30 @@ Live data uses, with automatic fallback:
    sample matches, clearly labelled, so you always see *something*.
 
 Responses are cached (default 30s, `STUMPS_CACHE_TTL` to change) to respect rate
-limits.
+limits. You're only told the source has changed when it matters: a normal run
+just shows the cricket; the header notes `source: cached (as of …)` when serving
+the last-good offline snapshot, or `(demo data — live sources unavailable)` when
+both live sources are down.
+
+### Hybrid: fuller scorecards with a cricketdata.org key
+
+ESPN is the primary source, but its scorecard only gives the dismissal *mode*
+("caught", "bowled"). If you set a **cricketdata.org key**, `stumps --match`
+upgrades each how-out to the **full text** — "c Beth Mooney b Lucy Hamilton",
+"run out (Wareham)" — by looking the same match up on cricketdata and merging
+its richer dismissals into ESPN's card.
+
+It's **best-effort and silent**: with no key, on a quota breach, or when the
+match can't be matched, you simply keep ESPN's mode — never an error (ESPN
+working is all you need). Dismissals never change once a wicket falls, so the
+data is cached hard (a finished match's card for a week), and the lookup only
+happens for the one match you drill into — so it's gentle on the API.
+
+**Free vs paid:** cricketdata's free tier allows ~100 requests/day, which is
+ample for occasional `--match` use given the aggressive caching. If you drill
+into many different matches a day (or want it as a routine fallback too), a
+[paid cricketdata plan](https://cricketdata.org/) lifts the limit — but it's
+entirely optional; everything else works without a key.
 
 ## Win probability
 
