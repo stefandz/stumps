@@ -215,6 +215,16 @@ def test_match_detail_shows_partnerships():
     assert "Sarkar 39" in out and "Shanto 45" in out and "│" in out
 
 
+def test_over_sparkline():
+    from stumps.models import Innings, OverScore
+    from stumps.render.console import _over_sparkline
+    inns = Innings("A", "B", 1, 20, 2, 3.0,
+                   over_scores=[OverScore(5, 0), OverScore(9, 1), OverScore(6, 0)])
+    line = _over_sparkline(inns).plain
+    assert line.startswith("Over by over") and "RR" in line
+    assert _over_sparkline(Innings("A", "B", 1)) is None  # no per-over data
+
+
 def test_match_detail_shows_fall_of_wickets():
     from stumps.models import FallOfWicket, Innings, Match, Team
     from stumps.render.console import render_match_detail
@@ -245,6 +255,22 @@ def test_partnerships_fall_back_to_plain_list_without_split():
     assert "Partnerships" in out
     assert "Rory Burns & Dom Sibley" in out and "255" in out
     assert "█" not in out  # no diverging bar when the per-batter split is absent
+
+
+def test_captain_marked_in_batting_card():
+    from stumps.models import Batter, Innings, Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("c", Format.ODI, [Team("A"), Team("B")], phase=Phase.COMPLETE,
+              status_text="A won",
+              innings=[Innings("A", "B", 1, 100, 2, 20.0, batters=[
+                  Batter("Jos Buttler", 50, 30, 5, 1, not_out=False, dismissal="caught",
+                         captain=True),
+                  Batter("Joe Root", 40, 35, 3, 0, not_out=True)])])
+    c = Console(width=80, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "Jos Buttler (c)" in out          # captain marked
+    assert "Joe Root" in out and "Joe Root (c)" not in out  # non-captain unmarked
 
 
 def test_match_detail_shows_toss_and_officials():

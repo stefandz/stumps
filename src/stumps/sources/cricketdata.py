@@ -162,7 +162,9 @@ class CricketDataSource(DataSource):
         if len(wanted) < 2:
             return ""
         for offset in (0, 25):
-            cm = self._get("currentMatches", {"offset": offset}).get("data") or []
+            # The teams->id mapping is stable, so cache the lookup for an hour —
+            # a --match --refresh watch loop then won't re-hit this each tick.
+            cm = self._get("currentMatches", {"offset": offset}, ttl=3600).get("data") or []
             for m in cm:
                 teams = [str(t).lower() for t in (m.get("teams") or [])]
                 if len(teams) < 2:

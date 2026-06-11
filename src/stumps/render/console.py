@@ -234,8 +234,8 @@ def _batting_table(inns, *, full: bool = False) -> Table | None:
         t.add_column("how out", style="dim")
     for b in batters:
         starred = b.on_strike or (full and b.not_out)
-        name = Text(b.name + (" *" if starred else ""),
-                    style="bold" if b.on_strike else "")
+        label = b.name + (" (c)" if b.captain else "") + (" *" if starred else "")
+        name = Text(label, style="bold" if b.on_strike else "")
         row = [name, str(b.runs), str(b.balls), f"{b.fours}/{b.sixes}",
                f"{b.strike_rate:.0f}"]
         if full:
@@ -494,6 +494,25 @@ def _compact_line(match: Match, cls: Classification) -> Text:
     return line
 
 
+_SPARK = "▁▂▃▄▅▆▇█"
+
+
+def _over_sparkline(inns) -> Text | None:
+    """An over-by-over manhattan: one block per over scaled to runs, wicket overs
+    in red, with the innings run rate. Empty unless we have per-over data."""
+    overs = inns.over_scores
+    if not overs:
+        return None
+    peak = max((o.runs for o in overs), default=0)
+    line = Text()
+    line.append("Over by over  ", style="bold")
+    for o in overs:
+        level = round(o.runs / peak * (len(_SPARK) - 1)) if peak else 0
+        line.append(_SPARK[level], style="red" if o.wickets else "cyan")
+    line.append(f"  RR {inns.run_rate:.1f}", style="dim")
+    return line
+
+
 def _fall_of_wickets_line(inns) -> Text | None:
     """Classic fall-of-wickets line: "Fall  1-27 (Burns, 9.2) · 2-53 …"."""
     if not inns.fall_of_wickets:
@@ -667,6 +686,9 @@ def _match_panel(
                     body.append(bat)
                 if bowl is not None:
                     body.append(bowl)
+                spark = _over_sparkline(inns)
+                if spark is not None:
+                    body.append(spark)
         if prefs.show_dls:
             dls_line = _dls_line(match)
             if dls_line is not None:
@@ -719,6 +741,9 @@ def render_match_detail(
         fow = _fall_of_wickets_line(inns)
         if fow is not None:
             body.append(fow)
+        spark = _over_sparkline(inns)
+        if spark is not None:
+            body.append(spark)
         # Blank lines between the batting+fall block, the bowling card and the
         # partnerships so the innings doesn't read as one dense slab.
         bowl = _bowling_table(inns, full=True)

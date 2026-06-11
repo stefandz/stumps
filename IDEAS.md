@@ -59,12 +59,17 @@ Mostly consolidation rather than new features — in rough priority order.
 
 ### Small features
 
-- **`--match` + `--refresh` as a "watch this game" mode.** The refresh loop
-  already honours `--match`; confirm it works and document it as a feature.
+- ~~**`--match` + `--refresh` "watch" mode.**~~ DONE: works (the refresh loop
+  honours `--match`); documented; the augment match-id lookup is cached for an
+  hour so the loop doesn't re-hit cricketdata each tick.
+- ~~**Over-by-over sparkline.**~~ DONE: `_over_sparkline` — a manhattan of
+  per-over runs (wicket overs in red) + run rate, from the linescore
+  `statistics.overs`, in `--match` per innings and the live current innings.
+- ~~**Captain marker.**~~ DONE: captains marked `(c)` (`Batter.captain`). The
+  wicketkeeper is *not* shown — ESPN reports a player's role (squads have two
+  keeper-batters), not who kept the match, so it can't be determined reliably.
 - **Tab-completion for `--match`** (team names), alongside the existing
-  `--team`/`--region`/`--domestic` completion.
-- **Run-rate worm / over-by-over sparkline** for a chase — the data shape
-  supports it, and it'd pair with the win-probability bar.
+  `--team`/`--region`/`--domestic` completion. (Still open.)
 
 ### Diminishing returns
 

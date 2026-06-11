@@ -213,8 +213,12 @@ sources/* ── Match objects ──> prioritise ──> render
   a fall-of-wickets line (every innings, from the linescore `fow` — populated
   even for county games), partnerships (every innings, from the linescore
   `partnerships`, as a back-to-back bar of each batter's runs on a shared centre
-  line — falling back to a plain list when the per-batter split is absent), the
-  toss and the umpires.
+  line — falling back to a plain list when the per-batter split is absent), an
+  over-by-over sparkline (`_over_sparkline`, from the linescore
+  `statistics.overs`; also shown for the live current innings), the toss and the
+  umpires. Captains are marked `(c)` (`Batter.captain`); the wicketkeeper isn't
+  (ESPN gives a player's *role*, not the match keeper). `--match --refresh` is a
+  single-match "watch" mode. `*` = not-out / on-strike.
   **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
   fetch (`lookback_days=prefs.results_days`) → prioritise → enrich (active matches

@@ -331,6 +331,18 @@ def test_espn_partnerships_from_linescore(settings):
     assert src._partnerships({}) == []
 
 
+def test_espn_over_scores_from_linescore(settings):
+    src = EspnSource(settings)
+    ov = src._over_scores({"statistics": {"overs": [[
+        {"number": "1", "runs": "5", "wicket": []},
+        {"number": "2", "runs": "9", "wicket": [{"shortText": "OUT"}]},
+        {"number": "3", "runs": "0", "wicket": []},
+    ]]}})
+    assert [o.runs for o in ov] == [5, 9, 0]
+    assert ov[1].wickets == 1 and ov[0].wickets == 0
+    assert src._over_scores({}) == []
+
+
 def test_espn_fall_of_wickets_from_linescore(settings):
     src = EspnSource(settings)
     fow = src._fall_of_wickets({"fow": [

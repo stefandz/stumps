@@ -111,6 +111,7 @@ class Batter:
     not_out: bool = True
     dismissal: str | None = None  # e.g. "c Smith b Cummins"; None if not out
     on_strike: bool = False
+    captain: bool = False
 
     @property
     def strike_rate(self) -> float:
@@ -164,6 +165,14 @@ class FallOfWicket:
 
 
 @dataclass
+class OverScore:
+    """Runs (and wickets) in a single over — for the over-by-over sparkline."""
+
+    runs: int = 0
+    wickets: int = 0
+
+
+@dataclass
 class Innings:
     batting_team: str
     bowling_team: str = ""
@@ -180,6 +189,7 @@ class Innings:
     bowlers: list[Bowler] = field(default_factory=list)
     partnerships: list[Partnership] = field(default_factory=list)
     fall_of_wickets: list[FallOfWicket] = field(default_factory=list)
+    over_scores: list[OverScore] = field(default_factory=list)
 
     @property
     def score(self) -> str:

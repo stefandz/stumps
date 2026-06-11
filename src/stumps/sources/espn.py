@@ -21,8 +21,8 @@ from typing import Any
 
 from stumps import config
 from stumps.models import (
-    Ball, Batter, Bowler, FallOfWicket, Format, Innings, Match, Partnership, Phase,
-    Standings, StandingsRow, Team,
+    Ball, Batter, Bowler, FallOfWicket, Format, Innings, Match, OverScore,
+    Partnership, Phase, Standings, StandingsRow, Team,
 )
 from stumps.sources.base import DataSource, DiskCache, SourceError
 
@@ -400,6 +400,15 @@ class EspnSource(DataSource):
         return out
 
     @staticmethod
+    def _over_scores(ls: dict) -> list[OverScore]:
+        """Runs/wickets per over, from the linescore `statistics.overs` block
+        (a list of {number, runs, wicket[...]}), in over order."""
+        overs = (ls.get("statistics") or {}).get("overs") or []
+        rows = overs[0] if overs and isinstance(overs[0], list) else []
+        return [OverScore(runs=_to_int(o.get("runs")),
+                          wickets=len(o.get("wicket") or [])) for o in rows]
+
+    @staticmethod
     def _fall_of_wickets(ls: dict) -> list[FallOfWicket]:
         """Fall of wickets for one innings, from its linescore `fow` block —
         populated for every innings of every match type (incl. county)."""
@@ -530,6 +539,7 @@ class EspnSource(DataSource):
                 bowlers=self._bowlers(rosters, team_name, period),
                 partnerships=self._partnerships(ls),
                 fall_of_wickets=self._fall_of_wickets(ls),
+                over_scores=self._over_scores(ls),
             )
             innings.append(inns)
         return innings
@@ -578,6 +588,7 @@ class EspnSource(DataSource):
                 not_out=not dismissed,
                 dismissal=(how or "out") if dismissed else None,
                 on_strike=bool(entry.get("active")),
+                captain=bool(entry.get("captain")),
             )
             ranked.append((_to_int(st.get("battingPosition")) or 99, batter))
         # Real batting order, not not-out-first.
