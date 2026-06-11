@@ -38,11 +38,15 @@ Mostly consolidation rather than new features — in rough priority order.
 
 ### Health / consolidation
 
-- **`cricketdata.org` fallback has fallen behind.** Everything rich we added
-  (winner flag, points, standings, partnerships, fall of wickets, multi-day
-  timing, recent results, upcoming fixtures) is ESPN-only. If ESPN 403s and we
-  fall back, the experience drops to bare scores. Decide consciously: accept it
-  as a deliberately-degraded backstop (and document), or close some of the gap.
+- ~~**`cricketdata.org` fallback has fallen behind.**~~ DECIDED: kept as a
+  deliberately-degraded backstop (documented in `sources/cricketdata.py`). It
+  gives live/recent scores, status/result, start times and full scorecards (with
+  full `dismissal-text` — richer than ESPN's how-out mode); the ESPN-only extras
+  (points/standings/partnerships/FoW/timing/recent-lookback/upcoming) default
+  safely and the renderers guard on them, so it degrades gracefully. Parity
+  isn't worth it for a source only hit when ESPN is down.
+- ~~**Two match-panel renderers duplicated.**~~ DONE: extracted `_labelled`,
+  `_headline_line`, `_wrap_panel`.
 - **Config defaults for the newer toggles.** `results_days`/`upcoming_days` read
   from config; `notify`, `standings`, `core_results` don't. Wire them so they
   stick without flags.

@@ -10,6 +10,16 @@ Endpoints (under ``api.cricapi.com/v1``):
   - ``match_scorecard?apikey=&id=`` — full batting/bowling figures.
 
 Response envelope: ``{"status": "success", "data": [...], "info": {...}}``.
+
+**Deliberately a degraded backstop.** This source provides live/recent scores,
+the status/result line, start times, and full scorecards (with full
+``dismissal-text`` — actually richer than ESPN's how-out *mode*). It does *not*
+populate the ESPN-only extras: points, standings, partnerships, fall of wickets,
+multi-day timing for the win/draw estimate, the past-days results lookback
+(``fetch_recent_results``) or upcoming-fixtures fetch (``fetch_upcoming``). Every
+such field defaults safely and every renderer guards on it, so a cricketdata
+match degrades gracefully — it just shows less. Reaching parity isn't worth it
+for a source only hit when ESPN is down.
 """
 
 from __future__ import annotations
@@ -139,6 +149,7 @@ class CricketDataSource(DataSource):
             status_text=status,
             venue=raw.get("venue", ""),
             source=self.name,
+            starts_at=str(raw.get("dateTimeGMT") or ""),
         )
         if phase is Phase.COMPLETE:
             match.result_text = status

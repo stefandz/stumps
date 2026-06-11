@@ -118,6 +118,15 @@ def test_cricketdata_normalises_mangled_team_labels(settings):
     assert match.innings[1].batting_team == "Pakistan Women"
 
 
+def test_cricketdata_sets_start_time(settings):
+    src = CricketDataSource(settings)
+    raw = {"id": "u", "name": "Upcoming Match", "matchType": "t20",
+           "status": "Match not started", "teams": ["A", "B"],
+           "dateTimeGMT": "2026-06-20T14:00:00", "matchStarted": False}
+    m = src._normalise(raw)
+    assert m.starts_at == "2026-06-20T14:00:00" and m.phase is Phase.UPCOMING
+
+
 def test_cricketdata_requires_key(settings):
     src = CricketDataSource(settings)
     assert not src.available

@@ -8,7 +8,7 @@ chases, and a win-probability bar — labelled as an estimate, not WinViz.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -95,11 +95,16 @@ def _phase_badge(match: Match) -> Text:
 
 
 def _local_start(iso: str) -> str:
-    """ISO UTC start time -> local 'Sat 13 Jun, 09:00' (or '' if unparseable)."""
+    """ISO UTC start time -> local 'Sat 13 Jun, 09:00' (or '' if unparseable).
+
+    A tz-naive timestamp (e.g. cricketdata's GMT times carry no 'Z') is treated
+    as UTC rather than local."""
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
     except ValueError:
         return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone().strftime("%a %d %b, %H:%M")
 
 

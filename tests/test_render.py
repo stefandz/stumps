@@ -382,6 +382,7 @@ def test_local_start_and_upcoming_panel():
     from stumps.render.console import _local_start
     assert _local_start("2026-06-13T08:00:00Z")  # parses to a non-empty label
     assert _local_start("bogus") == ""
+    assert _local_start("2026-06-13T08:00:00")  # tz-naive (cricketdata) still parses
     m = Match("u", Format.ODI, [Team("England"), Team("India")],
               phase=Phase.UPCOMING, status_text="Scheduled",
               starts_at="2026-06-13T08:00:00Z")

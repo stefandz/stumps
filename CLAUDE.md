@@ -53,7 +53,10 @@ sources/* ── Match objects ──> prioritise ──> render
   `enrich(match)` (fetch detailed figures for matches we'll actually show), and
   an optional `fetch_recent_results(days)` (finished games from past dates).
   `aggregator.py` tries ESPN → cricketdata.org → demo data, in order, returning a
-  `FetchResult`; `fetch(lookback_days=N)` merges `fetch_recent_results(N)` into
+  `FetchResult`. **cricketdata.org is a deliberately-degraded backstop** — scores,
+  status/result, start times, full scorecards (with full `dismissal-text`), but
+  none of the ESPN-only extras (points/standings/partnerships/FoW/timing/recent
+  lookback/upcoming); those fields default safely and renderers guard on them. `fetch(lookback_days=N)` merges `fetch_recent_results(N)` into
   the live list (deduped by id, live wins) so results that aged out of the live
   feed still show; `fetch(upcoming_days=N)` likewise merges `fetch_upcoming(N)`
   (future `&dates=` headers) so core teams' coming fixtures show with a local
