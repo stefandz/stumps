@@ -192,3 +192,16 @@ def test_results_days_resolution():
     assert Preferences.resolve(SimpleNamespace(), {"results_days": 4}).results_days == 4
     assert Preferences.resolve(SimpleNamespace(results=2),
                                {"results_days": 4}).results_days == 2
+
+
+def test_boolean_toggles_from_config():
+    from types import SimpleNamespace
+    cfg = {"notify": True, "standings": True, "core_results": True}
+    p = Preferences.resolve(SimpleNamespace(), cfg)
+    assert p.notify and p.show_standings and p.core_results_only
+    # Off by default with no config.
+    d = Preferences.resolve(SimpleNamespace())
+    assert not (d.notify or d.show_standings or d.core_results_only)
+    # The flag still turns it on even if config omits/disables it.
+    f = Preferences.resolve(SimpleNamespace(standings=True), {"standings": False})
+    assert f.show_standings

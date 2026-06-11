@@ -91,6 +91,11 @@ class Preferences:
             prefs.results_days = int(config["results_days"])
         if "upcoming_days" in config:
             prefs.upcoming_days = int(config["upcoming_days"])
+        # Boolean display/behaviour toggles: config sets the default; the
+        # corresponding store_true flag can only turn it on (no off-flag).
+        prefs.notify = bool(config.get("notify", prefs.notify))
+        prefs.show_standings = bool(config.get("standings", prefs.show_standings))
+        prefs.core_results_only = bool(config.get("core_results", prefs.core_results_only))
 
         # CLI overrides
         if getattr(args, "team", None):
@@ -131,7 +136,7 @@ class Preferences:
         prefs.show_winprob = not getattr(args, "no_winprob", False)
         prefs.show_dls = not getattr(args, "no_dls", False)
         prefs.show_commentary = not getattr(args, "no_commentary", False)
-        prefs.show_standings = getattr(args, "standings", False)
+        prefs.show_standings = prefs.show_standings or getattr(args, "standings", False)
         prefs.show_table = not getattr(args, "no_table", False)
         if getattr(args, "balls", None) is not None:
             prefs.balls = args.balls
@@ -139,7 +144,7 @@ class Preferences:
             prefs.results_days = 0
         elif getattr(args, "results", None) is not None:
             prefs.results_days = max(0, args.results)
-        prefs.core_results_only = getattr(args, "core_results", False)
+        prefs.core_results_only = prefs.core_results_only or getattr(args, "core_results", False)
         if getattr(args, "upcoming", None) is not None:
             prefs.upcoming_days = max(0, args.upcoming)
         if not prefs.show_upcoming:
@@ -147,5 +152,5 @@ class Preferences:
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
         prefs.oneline = getattr(args, "oneline", False)
-        prefs.notify = getattr(args, "notify", False)
+        prefs.notify = prefs.notify or getattr(args, "notify", False)
         return prefs

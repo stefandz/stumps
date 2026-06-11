@@ -153,10 +153,16 @@ It writes `~/.config/stumps/config.toml` (chmod 600, since it may hold your key)
 team = ["India", "Mumbai Indians"]   # who to put first
 region = "in"                         # ESPN coverage region
 domestic = "india"                    # home domestic scene (any full member, or none)
-cricketdata_api_key = "…"            # optional fallback-source key
+cricketdata_api_key = "…"            # optional fallback / augmentation key
+results_days = 2                      # days of past results to pull in (0 = off)
+upcoming_days = 3                     # days of upcoming fixtures to pull in (0 = off)
+notify = true                         # desktop alerts on a wicket/result (with --refresh)
+standings = true                      # always append league tables
+core_results = false                  # keep history to your core teams only
 ```
 
-CLI flags always override the config file.
+CLI flags override the config file (the boolean toggles can be turned *on* by
+their flag; to turn one off, drop it from the config).
 
 `--domestic` understands every ICC full member — `england`, `india`,
 `australia`, `pakistan`, `south-africa`, `new-zealand`, `sri-lanka`,
