@@ -9,8 +9,10 @@ via `--team`):
    tournaments** (World Cup, T20 World Cup, Champions Trophy, WTC final).
 3. Then your **home domestic** cricket — England's counties by default; India or
    Australia via `--domestic`.
-4. Everything else last — and by default only a **live international involving a
-   full-member nation**; associate-vs-associate games need `--all` (or `--tier all`).
+4. Everything else last — and by default only a **full-member international**
+   (live, and lingering briefly after it finishes so a game you were watching
+   doesn't vanish; `--core-results` keeps history to your teams only).
+   Associate-vs-associate games need `--all` (or `--tier all`).
 
 For each match you get the live score, a synthesised headline that frames the
 chase — "India require 71 runs from 12.0 overs" in limited-overs games (dropping
@@ -72,6 +74,7 @@ stumps --match england  # drill into one match: the full scorecard (all innings)
 stumps --standings      # append the league/points table for each competition
 stumps --results 3      # also show the last 3 days of followed/domestic results
 stumps --no-results     # only today's matches (don't look back)
+stumps --core-results   # keep recent results to your core teams only
 stumps --all            # include every match, not just ones of interest
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
 stumps --refresh 30 --notify   # + desktop alert on a wicket/result for your team

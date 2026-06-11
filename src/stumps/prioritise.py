@@ -192,16 +192,21 @@ def _passes_tier(match: Match, cls: Classification, prefs: Preferences) -> bool:
         return True
     if int(cls.tier) <= prefs.tier_floor:
         return True
-    # When the floor includes domestic, still surface a live international that
-    # didn't otherwise qualify (e.g. a marquee game between two full-member teams
-    # you don't follow) — but not associate-vs-associate minnow games, and not
-    # for the stricter followed/premier floors.
-    return (
+    # When the floor includes domestic, still surface a notable international
+    # (full-member, not associate-vs-associate minnow games) that didn't
+    # otherwise qualify — while it's live, AND for a little after it finishes, so
+    # a game you were watching doesn't vanish the moment it ends (bounded by the
+    # --results window). `--core-results` opts out, keeping history to your teams.
+    if (
         prefs.tier_floor >= Tier.HOME_DOMESTIC
-        and match.phase.is_active_today
         and match.format.is_international
         and _involves_full_member(match)
-    )
+    ):
+        if match.phase.is_active_today:
+            return True
+        if match.phase is Phase.COMPLETE and not prefs.core_results_only:
+            return True
+    return False
 
 
 def _passes_filters(match: Match, prefs: Preferences) -> bool:

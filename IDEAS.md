@@ -44,6 +44,15 @@ top match — preferring one in play, falling back to the top recent result —
 e.g. `🏏 NZ 280/8  IND 210/4 — India require 71 runs from 12.0 overs`. For tmux /
 polybar / a menu bar. `oneline()` in `render/console.py`.
 
+## 6. Keep notable internationals in history — DONE
+
+A full-member international shown live used to vanish the instant it finished
+(finished games were core-only). Now `_passes_tier` keeps it for a little after
+it ends too (symmetric with the live catch-all, bounded by `--results`), so a
+game you were watching doesn't disappear. Associate games still don't linger.
+Default-on; `--core-results` (`Preferences.core_results_only`) keeps history to
+your core teams.
+
 ## 5. Offline last-good cache — DONE
 
 When all live sources fail, the aggregator serves the **last successful fetch**

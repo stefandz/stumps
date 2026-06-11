@@ -90,6 +90,9 @@ def _show_parser() -> argparse.ArgumentParser:
                         "followed/domestic/premier matches (default 1)")
     b.add_argument("--no-results", action="store_true",
                    help="don't pull in past days' results (only today's)")
+    b.add_argument("--core-results", action="store_true",
+                   help="keep recent results to your core teams only (by default "
+                        "a notable international you saw live also lingers after it ends)")
 
     c = p.add_argument_group("display")
     c.add_argument("--compact", action="store_true", help="one line per match")

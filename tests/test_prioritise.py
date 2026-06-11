@@ -58,14 +58,20 @@ def test_icc_warmups_and_qualifiers_are_not_premier():
     assert is_icc_tournament(warmup, include_warmups=True)
 
 
-def test_finished_warmup_is_filtered_but_live_one_is_kept():
+def test_warmup_internationals_show_live_and_linger_after():
+    # Warm-ups aren't "premier", but they are full-member internationals, so the
+    # catch-all surfaces them live — and (by the symmetric rule) they linger
+    # briefly after finishing rather than vanishing.
     live_warmup = _match(Format.WT20I, "ICC Womens T20 World Cup Warm-up Matches",
                          "Ireland Women", "Bangladesh Women", phase=Phase.LIVE)
     done_warmup = _match(Format.WT20I, "ICC Womens T20 World Cup Warm-up Matches",
                          "New Zealand Women", "Bangladesh Women", phase=Phase.COMPLETE)
-    ranked = prioritise([live_warmup, done_warmup])
-    assert live_warmup in [m for m, _ in ranked]
-    assert done_warmup not in [m for m, _ in ranked]
+    shown = [m for m, _ in prioritise([live_warmup, done_warmup])]
+    assert live_warmup in shown and done_warmup in shown
+    # --core-results drops the finished non-core game (the live one still shows).
+    core = [m for m, _ in prioritise([live_warmup, done_warmup],
+                                     Preferences(core_results_only=True))]
+    assert live_warmup in core and done_warmup not in core
 
 
 def test_home_domestic_england_india_australia():
@@ -122,10 +128,21 @@ def test_live_associate_international_not_surfaced_by_default():
     # --all (tier floor = all) shows the associate game too.
     assert [m for m, _ in prioritise([assoc], Preferences(tier_floor=int(Tier.OTHER)))] \
         == [assoc]
-    # The catch-all is live-only: a finished full-member game that doesn't
-    # otherwise qualify still isn't surfaced at the domestic floor.
+
+
+def test_finished_full_member_international_lingers_by_default():
+    # A notable international you'd see live shouldn't vanish the moment it ends.
     done = _match(Format.T20I, "Bilateral", "Australia", "Zimbabwe", phase=Phase.COMPLETE)
-    assert prioritise([done]) == []
+    assert [m for m, _ in prioritise([done])] == [done]
+    # --core-results opts out: history is then your core teams only.
+    assert prioritise([done], Preferences(core_results_only=True)) == []
+    # A finished *associate* game never lingers (would flood history).
+    assoc = _match(Format.WT20I, "Kwibuka Women's T20", "Rwanda Women",
+                   "Malawi Women", phase=Phase.COMPLETE)
+    assert prioritise([assoc]) == []
+    # Core finished games are unaffected by --core-results.
+    eng = _match(Format.ODI, "Bilateral", "England", "India", phase=Phase.COMPLETE)
+    assert [m for m, _ in prioritise([eng], Preferences(core_results_only=True))] == [eng]
 
 
 def test_filter_live_only():

@@ -104,10 +104,13 @@ sources/* ── Match objects ──> prioritise ──> render
   assigns a `Tier` (FOLLOWED/PREMIER/HOME_DOMESTIC/OTHER); `prioritise(matches,
   prefs)` filters (formats, gender, phase, series, tier floor, limit) + sorts
   (tier, then live-before-stumps-before-finished, then format). At the default
-  (domestic) floor, `_passes_tier` also surfaces a live international that didn't
-  otherwise qualify — but only if it **involves a full-member nation**
-  (`_involves_full_member`), so associate-vs-associate games (Austria v Finland)
-  stay out of the default view; `--all` shows them. Classification
+  (domestic) floor, `_passes_tier` also surfaces a **full-member international**
+  (`_involves_full_member`; associate-vs-associate games like Austria v Finland
+  stay out — `--all` shows them) — while it's live *and*, by default, for a
+  little after it finishes (bounded by the `--results` window) so a game you were
+  watching doesn't vanish the moment it ends. `--core-results`
+  (`Preferences.core_results_only`) opts out, keeping finished games to your core
+  tiers. Classification
   depends on the allow-lists in `config.py` because **no feed has a clean flag**
   for "top-tier Test" / "World Cup" / "county" — matched by team/series name.
   "Home domestic" is generalised via `config.DOMESTIC_SCENES` (england/india/

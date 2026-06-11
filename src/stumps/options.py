@@ -44,9 +44,13 @@ class Preferences:
     limit: int | None = None
     #: Drill into a single match (substring of title/series) with a full scorecard.
     match_query: str | None = None
-    #: How many past days of finished results to pull in (followed/domestic/
-    #: premier only); 0 disables. Default surfaces yesterday's results.
+    #: How many past days of finished results to pull in; 0 disables. Default
+    #: surfaces yesterday's results.
     results_days: int = 1
+    #: Keep recent results to your core teams only (followed/domestic/premier).
+    #: Off by default: a notable international you saw live also lingers after it
+    #: finishes, so it doesn't vanish the moment it ends.
+    core_results_only: bool = False
 
     # C — display
     compact: bool = False
@@ -130,6 +134,7 @@ class Preferences:
             prefs.results_days = 0
         elif getattr(args, "results", None) is not None:
             prefs.results_days = max(0, args.results)
+        prefs.core_results_only = getattr(args, "core_results", False)
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
         prefs.oneline = getattr(args, "oneline", False)
