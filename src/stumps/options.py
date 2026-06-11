@@ -51,6 +51,9 @@ class Preferences:
     #: Off by default: a notable international you saw live also lingers after it
     #: finishes, so it doesn't vanish the moment it ends.
     core_results_only: bool = False
+    #: How many days ahead to pull in scheduled fixtures (your core teams);
+    #: 0 disables. Default shows the next few days.
+    upcoming_days: int = 3
 
     # C — display
     compact: bool = False
@@ -86,6 +89,8 @@ class Preferences:
             prefs.domestic = resolve_domestic_key(config["domestic"])
         if "results_days" in config:
             prefs.results_days = int(config["results_days"])
+        if "upcoming_days" in config:
+            prefs.upcoming_days = int(config["upcoming_days"])
 
         # CLI overrides
         if getattr(args, "team", None):
@@ -135,6 +140,10 @@ class Preferences:
         elif getattr(args, "results", None) is not None:
             prefs.results_days = max(0, args.results)
         prefs.core_results_only = getattr(args, "core_results", False)
+        if getattr(args, "upcoming", None) is not None:
+            prefs.upcoming_days = max(0, args.upcoming)
+        if not prefs.show_upcoming:
+            prefs.upcoming_days = 0  # --no-upcoming: don't even fetch them
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
         prefs.oneline = getattr(args, "oneline", False)

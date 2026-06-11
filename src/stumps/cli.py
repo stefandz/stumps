@@ -93,6 +93,9 @@ def _show_parser() -> argparse.ArgumentParser:
     b.add_argument("--core-results", action="store_true",
                    help="keep recent results to your core teams only (by default "
                         "a notable international you saw live also lingers after it ends)")
+    b.add_argument("--upcoming", type=int, metavar="DAYS", default=None,
+                   help="include scheduled fixtures for your teams over the next "
+                        "DAYS days (default 3; 0 to disable)")
 
     c = p.add_argument_group("display")
     c.add_argument("--compact", action="store_true", help="one line per match")
@@ -179,7 +182,8 @@ def _run_show(args: argparse.Namespace) -> int:
             render_match_detail(console, found, cls, settings, prefs)
 
     def run_once() -> None:
-        result = agg.fetch(lookback_days=prefs.results_days)
+        result = agg.fetch(lookback_days=prefs.results_days,
+                           upcoming_days=prefs.upcoming_days)
         if prefs.match_query:
             run_detail(result, prefs.match_query)
             return

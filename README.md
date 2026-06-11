@@ -75,6 +75,7 @@ stumps --standings      # append the league/points table for each competition
 stumps --results 3      # also show the last 3 days of followed/domestic results
 stumps --no-results     # only today's matches (don't look back)
 stumps --core-results   # keep recent results to your core teams only
+stumps --upcoming 7     # also show your teams' fixtures over the next 7 days
 stumps --all            # include every match, not just ones of interest
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
 stumps --refresh 30 --notify   # + desktop alert on a wicket/result for your team

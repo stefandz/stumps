@@ -45,7 +45,7 @@ class Aggregator:
             ]
         self._demo = DemoSource(settings)
 
-    def fetch(self, *, lookback_days: int = 0) -> FetchResult:
+    def fetch(self, *, lookback_days: int = 0, upcoming_days: int = 0) -> FetchResult:
         notices: list[str] = []
         for src in self.sources:
             if isinstance(src, CricketDataSource) and not src.available:
@@ -57,7 +57,9 @@ class Aggregator:
                 notices.append(f"{src.name} unavailable: {exc}")
                 continue
             if lookback_days > 0:
-                matches = self._with_recent(src, matches, lookback_days)
+                matches = self._merge(matches, src.fetch_recent_results, lookback_days)
+            if upcoming_days > 0:
+                matches = self._merge(matches, src.fetch_upcoming, upcoming_days)
             if not isinstance(src, DemoSource):
                 self._save_snapshot(matches)
             return FetchResult(matches, src, used_fallback=False, notices=notices)
@@ -81,15 +83,15 @@ class Aggregator:
         return FetchResult(matches, self._demo, used_fallback=True, notices=notices)
 
     @staticmethod
-    def _with_recent(src: DataSource, current: list[Match], days: int) -> list[Match]:
-        """Append recently-finished results that aren't already in the live feed
-        (which wins on conflicts, being the freshest)."""
+    def _merge(current: list[Match], fetcher, days: int) -> list[Match]:
+        """Append matches from a past/future fetcher that aren't already in the
+        live list (which wins on conflicts, being the freshest)."""
         try:
-            recent = src.fetch_recent_results(days)
+            extra = fetcher(days)
         except SourceError:
             return current
         seen = {m.match_id for m in current}
-        return current + [m for m in recent if m.match_id not in seen]
+        return current + [m for m in extra if m.match_id not in seen]
 
     def _snapshot_path(self) -> Path:
         return self.settings.cache_dir / "last_good.pkl"

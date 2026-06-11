@@ -314,6 +314,19 @@ def test_finished_label_shown_in_subtitle():
     assert "Yesterday" in _render(m, _settings())
 
 
+def test_local_start_and_upcoming_panel():
+    from stumps.models import Match, Team
+    from stumps.render.console import _local_start
+    assert _local_start("2026-06-13T08:00:00Z")  # parses to a non-empty label
+    assert _local_start("bogus") == ""
+    m = Match("u", Format.ODI, [Team("England"), Team("India")],
+              phase=Phase.UPCOMING, status_text="Scheduled",
+              starts_at="2026-06-13T08:00:00Z")
+    out = _render(m, _settings())
+    assert "Starts" in out          # the local start time is shown
+    assert "Scheduled" not in out   # the generic status is suppressed
+
+
 def test_no_data_match_shows_placeholder_not_empty_panel():
     from stumps.models import Match, Team
     # A live match listed before any scorecard exists (status just "Live").

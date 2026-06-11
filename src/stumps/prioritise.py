@@ -182,6 +182,7 @@ def _sort_key(item: tuple[Match, Classification]) -> tuple:
     return (
         int(cls.tier),
         _PHASE_RANK.get(match.phase, 5),
+        match.starts_at if match.phase is Phase.UPCOMING else "",  # soonest first
         _FORMAT_RANK.get(match.format, 9),
         match.title,
     )

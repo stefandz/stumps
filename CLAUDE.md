@@ -55,7 +55,9 @@ sources/* ── Match objects ──> prioritise ──> render
   `aggregator.py` tries ESPN → cricketdata.org → demo data, in order, returning a
   `FetchResult`; `fetch(lookback_days=N)` merges `fetch_recent_results(N)` into
   the live list (deduped by id, live wins) so results that aged out of the live
-  feed still show. A successful real fetch is pickled to `last_good.pkl`; if all
+  feed still show; `fetch(upcoming_days=N)` likewise merges `fetch_upcoming(N)`
+  (future `&dates=` headers) so core teams' coming fixtures show with a local
+  "Starts …" time. A successful real fetch is pickled to `last_good.pkl`; if all
   live sources later fail, the aggregator serves that snapshot (≤12h old) with
   `FetchResult.stale_as_of` set — "cached (as of …)" — in preference to demo. `fixtures.py` is the offline `DemoSource` and the single source
   of sample data for `--demo` and tests.

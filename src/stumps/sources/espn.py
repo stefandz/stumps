@@ -158,6 +158,26 @@ class EspnSource(DataSource):
                     recent[match.match_id] = match
         return list(recent.values())
 
+    def fetch_upcoming(self, days: int) -> list[Match]:
+        """Scheduled matches over the next ``days`` days (one cached header call
+        per day). Multi-day games span dates, so keep the earliest sighting."""
+        if days <= 0:
+            return []
+        from datetime import date, timedelta
+
+        today = date.today()
+        upcoming: dict[str, Match] = {}
+        for delta in range(1, days + 1):
+            day = today + timedelta(days=delta)
+            try:
+                data = self._get(f"{_SCOREBOARD}&dates={day:%Y%m%d}")
+            except SourceError:
+                continue
+            for match in self._parse_scoreboard(data):
+                if match.phase is Phase.UPCOMING:
+                    upcoming.setdefault(match.match_id, match)
+        return list(upcoming.values())
+
     def _event_to_match(self, event: dict, league_id: str, series_name: str) -> Match:
         cls = event.get("class") or {}
         fmt = self._format(cls, event.get("eventType", ""))
@@ -192,6 +212,7 @@ class EspnSource(DataSource):
             # `winner` boolean. No winner on a finished game -> drawn / tied.
             match.winner = self._winner_name(event.get("competitors") or [])
         match.day_number, match.total_days = _parse_day(status)
+        match.starts_at = event.get("date") or ""
         match.ball_by_ball_available = bool(event.get("playByPlayAvailable"))
         return match
 

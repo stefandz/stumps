@@ -411,6 +411,27 @@ def test_espn_fetch_recent_results(settings, monkeypatch):
     assert src.fetch_recent_results(0) == []  # disabled
 
 
+def test_espn_fetch_upcoming(settings, monkeypatch):
+    src = EspnSource(settings)
+
+    def fake_get(url):
+        assert "dates=" in url
+        pre = _espn_event()
+        pre["id"] = "900"
+        pre["date"] = "2026-06-20T10:00:00Z"
+        pre["fullStatus"] = {"type": {"state": "pre", "detail": "Scheduled"}}
+        live = _espn_event()
+        live["id"] = "901"  # state "in" -> not upcoming
+        return {"sports": [{"leagues": [
+            {"id": "9", "name": "Series", "events": [pre, live]}]}]}
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    out = src.fetch_upcoming(2)
+    assert {m.match_id for m in out} == {"900"}
+    assert out[0].starts_at == "2026-06-20T10:00:00Z"
+    assert src.fetch_upcoming(0) == []
+
+
 def test_aggregator_merges_recent_without_duplicates():
     from stumps.models import Match, Team
 
@@ -424,7 +445,7 @@ def test_aggregator_merges_recent_without_duplicates():
         def fetch_recent_results(self, days):
             return recent
 
-    merged = Aggregator._with_recent(_Src(), live, 2)
+    merged = Aggregator._merge(live, _Src().fetch_recent_results, 2)
     # Live "a" is kept (freshest); the recent duplicate is dropped; "b" is added.
     assert [m.match_id for m in merged] == ["a", "b"]
     assert merged[0].phase is Phase.LIVE

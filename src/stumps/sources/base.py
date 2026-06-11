@@ -52,6 +52,11 @@ class DataSource(ABC):
         """
         return []
 
+    def fetch_upcoming(self, days: int) -> list[Match]:
+        """Scheduled matches over the next ``days`` days (excluding today, which
+        `fetch_current_matches` already covers). Default none."""
+        return []
+
 
 class DiskCache:
     """Tiny TTL cache for raw JSON payloads, keyed by an opaque string.

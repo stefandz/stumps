@@ -145,6 +145,13 @@ def test_finished_full_member_international_lingers_by_default():
     assert [m for m, _ in prioritise([eng], Preferences(core_results_only=True))] == [eng]
 
 
+def test_upcoming_sorted_soonest_first():
+    a = _match(Format.ODI, "ICC Cricket World Cup", "England", "India", phase=Phase.UPCOMING)
+    b = _match(Format.ODI, "ICC Cricket World Cup", "England", "Australia", phase=Phase.UPCOMING)
+    a.starts_at, b.starts_at = "2026-06-20T10:00:00Z", "2026-06-18T10:00:00Z"
+    assert [m for m, _ in prioritise([a, b])] == [b, a]  # soonest (b) first
+
+
 def test_filter_live_only():
     ranked = prioritise(sample_matches(), Preferences(live_only=True))
     assert all(m.phase.is_active_today for m, _ in ranked)

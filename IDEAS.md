@@ -27,13 +27,14 @@ tracks what's done and what's still open.
 
 ## Open
 
-### 7. Upcoming fixtures view
+### 7. Upcoming fixtures view — DONE
 
-A forward-looking mirror of recent results: "when's England next on?". The ESPN
-header accepts future `&dates=YYYYMMDD`, and each event carries a start time we
-can render in local tz. A `--upcoming N` window (or a fixtures section) listing
-followed/domestic/premier teams' next games with date + local start time.
-Reuses the dated-fetch infra. Medium effort.
+Forward-looking mirror of recent results. `fetch_upcoming(days)` queries the
+header at future `&dates=`, and core teams' scheduled games show with a "Starts
+<local time>" line (`_local_start`), soonest-first. Default 3 days
+(`upcoming_days`, `--upcoming N`; `--no-upcoming` skips the fetch entirely).
+Tier-scoped for free (the catch-all is live/finished only, so non-core upcoming
+games don't leak in).
 
 ### 8. Net run rate + qualification in `--standings` — DONE
 

@@ -73,6 +73,7 @@ def _match_dict(match: Match, cls: Classification, settings: Settings,
         "venue": match.venue,
         "status": _headline(match),
         "result": match.result_text or None,
+        "starts_at": match.starts_at or None,
         "points": match.points or None,
         "innings": [_innings_dict(i) for i in match.innings],
     }

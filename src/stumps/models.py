@@ -210,6 +210,7 @@ class Match:
     result_text: str = ""  # populated when COMPLETE
     winner: str = ""        # winning team name when COMPLETE; "" if drawn/unknown
     finished_on: str = ""   # ISO date a recent result finished (recent-results fetch)
+    starts_at: str = ""     # ISO UTC start time (used for upcoming fixtures)
     points: str = ""        # league/tournament points awarded, e.g. "Surrey 15, Hampshire 13"
     standings: Standings | None = None  # league table for this competition (--standings)
     venue: str = ""

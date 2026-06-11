@@ -8,7 +8,7 @@ chases, and a win-probability bar — labelled as an estimate, not WinViz.
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime
 
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -58,7 +58,7 @@ def _accent(match: Match, cls: Classification) -> str:
 _GENERIC_STATUS = {
     "live", "stumps", "tea", "lunch", "drinks", "close", "close of play",
     "result", "stump", "final", "completed", "match ended", "end of match",
-    "rain", "bad light", "innings break", "break",
+    "rain", "bad light", "innings break", "break", "scheduled", "upcoming",
 }
 
 #: Specific break labels, most-specific first, matched as whole words against
@@ -88,6 +88,15 @@ def _phase_badge(match: Match) -> Text:
     if match.phase is Phase.BREAK:
         label = _break_badge_label(match)
     return Text(f" {label} ", style=style)
+
+
+def _local_start(iso: str) -> str:
+    """ISO UTC start time -> local 'Sat 13 Jun, 09:00' (or '' if unparseable)."""
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return dt.astimezone().strftime("%a %d %b, %H:%M")
 
 
 def _finished_label(match: Match) -> str:
@@ -522,6 +531,14 @@ def _match_panel(
     headline = _headline(match)
     if headline and headline.strip().lower() not in _GENERIC_STATUS:
         body.append(Text(headline, style="bold"))
+
+    if match.phase is Phase.UPCOMING and match.starts_at:
+        when = _local_start(match.starts_at)
+        if when:
+            starts = Text()
+            starts.append("Starts  ", style="bold")
+            starts.append(when, style="dim")
+            body.append(starts)
 
     scores = _scores_line(match)
     if scores.plain.strip():
