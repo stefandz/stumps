@@ -105,6 +105,7 @@ def render_json(
         "generated": when,
         "source": result.source.name,
         "fallback": result.used_fallback,
+        "stale_as_of": result.stale_as_of or None,
         "matches": [_match_dict(m, c, settings, prefs) for m, c in ranked],
     }
     return json.dumps(payload, indent=2)

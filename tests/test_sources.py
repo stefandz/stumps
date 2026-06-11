@@ -348,6 +348,28 @@ def test_aggregator_falls_back_to_demo(settings, monkeypatch):
     assert any("cricinfo unavailable" in n for n in result.notices)
 
 
+def test_aggregator_serves_last_good_snapshot_when_offline(settings, monkeypatch):
+    from stumps.models import Format, Match, Phase, Team
+
+    # First, a successful live fetch saves a snapshot.
+    live = [Match("a", Format.ODI, [Team("England"), Team("India")], phase=Phase.LIVE)]
+    monkeypatch.setattr(EspnSource, "fetch_current_matches", lambda self: live)
+    agg = Aggregator(settings)
+    ok = agg.fetch()
+    assert not ok.used_fallback and ok.matches[0].match_id == "a"
+
+    # Now the live source fails -> we serve the cached snapshot, not demo.
+    monkeypatch.setattr(
+        EspnSource, "fetch_current_matches",
+        lambda self: (_ for _ in ()).throw(SourceError("offline")),
+    )
+    stale = agg.fetch()
+    assert stale.used_fallback is False
+    assert stale.stale_as_of  # stamped with an "as of" time
+    assert [m.match_id for m in stale.matches] == ["a"]
+    assert any("cached data" in n for n in stale.notices)
+
+
 def test_aggregator_demo_only_mode(settings):
     agg = Aggregator(settings, demo_only=True)
     result = agg.fetch()

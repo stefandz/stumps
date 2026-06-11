@@ -41,9 +41,10 @@ top match — preferring one in play, falling back to the top recent result —
 e.g. `🏏 NZ 280/8  IND 210/4 — India require 71 runs from 12.0 overs`. For tmux /
 polybar / a menu bar. `oneline()` in `render/console.py`.
 
-## 5. Offline last-good cache
+## 5. Offline last-good cache — DONE
 
-When live sources fail, show the **last successful fetch** ("as of HH:MM")
-instead of dropping to demo data.
-
-- A resilience nicety. Low–medium effort.
+When all live sources fail, the aggregator serves the **last successful fetch**
+(pickled to `~/.cache/stumps/last_good.pkl`) instead of dropping to demo data,
+with the header noting "cached (as of …)". Capped at 12h old, after which demo
+is clearer. `Aggregator._save_snapshot`/`_load_snapshot`;
+`FetchResult.stale_as_of`.

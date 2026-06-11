@@ -621,9 +621,12 @@ def render_report(
         header.append(f"   {when}", style="dim")
     console.print(header)
 
-    src_note = f"source: {result.source.name}"
-    if result.used_fallback:
-        src_note += "  (demo data — live sources unavailable)"
+    if result.stale_as_of:
+        src_note = f"source: cached (as of {result.stale_as_of}) — live sources unavailable"
+    else:
+        src_note = f"source: {result.source.name}"
+        if result.used_fallback:
+            src_note += "  (demo data — live sources unavailable)"
     console.print(Text(src_note, style="dim"))
     for notice in result.notices:
         console.print(Text("· " + notice, style="dim yellow"))
