@@ -41,15 +41,19 @@ _TIER_ACCENT = {
     Tier.OTHER: "white",
 }
 
-#: A finished match gets a green frame (matching its ✓ RESULT badge) regardless
-#: of tier — "this is settled" reads more usefully here than the tier colour.
-_COMPLETE_ACCENT = "green4"
-
-
 def _accent(match: Match, cls: Classification) -> str:
-    if match.phase is Phase.COMPLETE:
-        return _COMPLETE_ACCENT
+    # The frame encodes relevance (tier); phase is carried by the section header
+    # and the badge.
     return _TIER_ACCENT.get(cls.tier, "white")
+
+
+#: Display sections, in order. Each match falls in exactly one (by phase); within
+#: a section they keep their relevance order. Headers give clear division.
+_SECTIONS = (
+    ("● Live", lambda p: p.is_active_today or p is Phase.UNKNOWN),
+    ("✓ Results", lambda p: p in (Phase.COMPLETE, Phase.ABANDONED)),
+    ("◌ Upcoming", lambda p: p is Phase.UPCOMING),
+)
 
 #: Bare state labels that the phase badge already conveys — never worth showing
 #: as a headline (e.g. a finished game whose only status text is "Result"). The
@@ -765,12 +769,19 @@ def render_report(
         console.print(Text("No matches of interest right now.", style="dim"))
         return
 
-    for match, cls in ranked:
-        if prefs.compact:
-            console.print(_compact_line(match, cls), no_wrap=True,
-                          overflow="ellipsis")
-        else:
-            console.print(_match_panel(match, cls, settings, prefs))
+    # Group into phase sections (live now / recently finished / coming up); within
+    # each, `ranked` is already in relevance order (tier, then format, then time).
+    for title, in_section in _SECTIONS:
+        section = [(m, c) for m, c in ranked if in_section(m.phase)]
+        if not section:
+            continue
+        console.rule(Text(title, style="bold"), align="left", style="dim")
+        for match, cls in section:
+            if prefs.compact:
+                console.print(_compact_line(match, cls), no_wrap=True,
+                              overflow="ellipsis")
+            else:
+                console.print(_match_panel(match, cls, settings, prefs))
 
     if prefs.show_standings:
         seen: set[str] = set()

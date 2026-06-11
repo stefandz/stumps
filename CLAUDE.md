@@ -190,9 +190,12 @@ sources/* ── Match objects ──> prioritise ──> render
   (`_final_innings_target`), otherwise the lead/trail line; everything else falls
   back to the source's own `status_text` (or a `_synth_result` fallback for
   finished games). `--compact` is one clipped line per match, leading with that
-  headline. The panel/title/border accent is the tier colour, except a **finished
-  match is always framed green** (`_accent` → `_COMPLETE_ACCENT`), matching its
-  ✓ RESULT badge. A match listed with no scorecard yet (just a toss, or feed lag)
+  headline. The report is grouped into phase **sections** (`_SECTIONS`: ● Live →
+  ✓ Results → ◌ Upcoming) with a header rule each; within a section, matches keep
+  their relevance order (tier, then format, then time). The panel/border accent
+  is the **tier colour** (`_accent`) — relevance; phase is carried by the section
+  header and the badge (so there's no second "green"). A match listed with no
+  scorecard yet (just a toss, or feed lag)
   degrades to a muted "No score yet"/"Yet to start" line rather than an empty
   frame. `--match TEXT` (substring of team/series) drills into one match via
   `render_match_detail` (`cli._find_match` selects it, tolerating "vs"/"vs." for

@@ -148,11 +148,13 @@ def test_synth_result_multiday_win_from_winner_flag():
     assert _synth_result(_completed_test(winner="England")) == "England won"
 
 
-def test_completed_match_gets_green_accent():
-    from stumps.render.console import _COMPLETE_ACCENT, _accent
-    m = _completed_test(winner="England")
-    # Border/title accent is green for a finished game, whatever its tier.
-    assert _accent(m, classify(m)) == _COMPLETE_ACCENT
+def test_accent_is_tier_colour_not_phase():
+    from stumps.render.console import _TIER_ACCENT, _accent
+    m = _completed_test(winner="England")  # England -> FOLLOWED tier
+    cls = classify(m)
+    # The frame encodes relevance (tier), not phase — phase is in the section
+    # header + badge.
+    assert _accent(m, cls) == _TIER_ACCENT[cls.tier]
 
 
 def test_drawn_multiday_panel_shows_match_drawn():
@@ -509,10 +511,21 @@ def test_compact_mode_is_one_line_per_match():
     render_report(console, result, ranked, settings, Preferences(compact=True))
     out = console.export_text()
     assert "Win probability" not in out and "Batting" not in out
+    # Drop blanks, the header/source lines, and the section rules ("─ Live ─…").
     body = [ln for ln in out.splitlines() if ln.strip() and "stumps" not in ln
-            and "source" not in ln]
+            and "source" not in ln and "─" not in ln]
     # roughly one line per shown match (not multi-line panels)
     assert len(body) <= len(ranked) + 1
+
+
+def test_report_grouped_into_phase_sections():
+    result, ranked, settings = _ranked_demo()
+    console = Console(width=100, record=True)
+    render_report(console, result, ranked, settings, Preferences())
+    out = console.export_text()
+    # Sections appear in order: live, then results, then upcoming.
+    assert "Live" in out and "Results" in out
+    assert out.index("Live") < out.index("Results")
 
 
 # -- JSON output ------------------------------------------------------------
