@@ -35,6 +35,20 @@ from stumps.sources.aggregator import Aggregator
 from stumps.sources.base import SourceError
 
 
+def _normalise(text: str) -> str:
+    """Lower-case and canonicalise the 'vs'/'vs.' separator to 'v', so
+    `--match "A vs B"` matches the "A v B" title."""
+    return text.lower().replace(" vs. ", " v ").replace(" vs ", " v ")
+
+
+def _find_match(matches, query: str):
+    """First match whose title or series contains the query (separator-tolerant)."""
+    q = _normalise(query)
+    return next(
+        (m for m in matches
+         if q in _normalise(m.title) or q in _normalise(m.series_name)), None)
+
+
 def _show_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stumps",
@@ -166,10 +180,7 @@ def _run_show(args: argparse.Namespace) -> int:
     notify_state: dict = {}
 
     def run_detail(result, query: str) -> None:
-        q = query.lower()
-        found = next(
-            (m for m in result.matches
-             if q in m.title.lower() or q in m.series_name.lower()), None)
+        found = _find_match(result.matches, query)
         if found is None:
             console.print(f"[dim]No match found for {query!r}.[/dim]")
             return

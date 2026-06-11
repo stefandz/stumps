@@ -195,7 +195,8 @@ sources/* ── Match objects ──> prioritise ──> render
   ✓ RESULT badge. A match listed with no scorecard yet (just a toss, or feed lag)
   degrades to a muted "No score yet"/"Yet to start" line rather than an empty
   frame. `--match TEXT` (substring of team/series) drills into one match via
-  `render_match_detail` — the full scorecard (every innings, all batters with
+  `render_match_detail` (`cli._find_match` selects it, tolerating "vs"/"vs." for
+  the "v" separator) — the full scorecard (every innings, all batters with
   how-out, all bowlers; the figure tables take a `full=True` mode), plus
   partnerships (every innings, from each innings' linescore `partnerships`,
   rendered as a back-to-back bar of each batter's runs on a shared centre line),
