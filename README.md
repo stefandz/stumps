@@ -34,11 +34,10 @@ source: cricinfo
 │ Batting                                                           │
 │ V Kohli *  92  88  7/1  105                                       │
 │ ...                                                               │
-│ DLS  21 ahead of DLS par (189)  · target 281  (Standard Edition)  │
+│ DLS  21 ahead of DLS par (189)  · target 281                      │
 │ Win probability                                                   │
 │ India        █████████████████████░░░   86%                       │
 │ New Zealand  ███░░░░░░░░░░░░░░░░░░░░░   14%                        │
-│ Cricsheet-trained model · Estimate only — not CricViz WinViz      │
 ╰─ ODI · ICC Cricket World Cup 2027 · Eden Gardens, Kolkata ────────╯
 ```
 

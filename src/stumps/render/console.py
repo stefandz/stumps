@@ -371,7 +371,6 @@ def _dls_line(match: Match) -> Text | None:
     txt.append("DLS  ", style="bold yellow")
     txt.append(result.status_phrase)
     txt.append(f"  · target {result.target}", style="dim")
-    txt.append("  (Standard Edition, indicative)", style="dim italic")
     return txt
 
 
@@ -391,17 +390,6 @@ def _winprob_block(est: WinEstimate, accent: str) -> Group:
     ordered = sorted(est.probabilities.items(), key=lambda kv: kv[1], reverse=True)
     for label, prob in ordered:
         rows.append(_winprob_bar(label, prob, accent))
-    method_tag = {
-        "model": "Cricsheet-trained model",
-        "heuristic": "rule-of-thumb (no model loaded)",
-        "first-innings-heuristic": "first-innings projection",
-        "test-heuristic": "rough Test lean",
-        "multiday-model": "Cricsheet-trained Test model",
-        "settled": "match decided",
-    }.get(est.method, est.method)
-    for line in est.extra:
-        rows.append(Text(line, style="dim"))
-    rows.append(Text(method_tag, style="dim italic"))
     return Group(*rows)
 
 

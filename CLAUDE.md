@@ -116,8 +116,9 @@ sources/* ── Match objects ──> prioritise ──> render
   cols = wickets lost) and interpolates; `par.py` implements ECB clause 5.6
   (`par_score`, `revised_target`). The CSV values are load-bearing and were
   transcribed + anchor-checked; don't "tidy" them. Only the Standard Edition is
-  public; the Professional Edition broadcasters use is proprietary, so par scores
-  are deliberately labelled "indicative".
+  public; the Professional Edition broadcasters use is proprietary — the console
+  no longer tags par scores "indicative" (kept clean by preference), but they are
+  still an approximation; the README's DLS section says so.
 
 - **`winprob/`** — the home-grown win estimate (**not** WinViz; it's proprietary
   with no API — and its endpoints carry no probability field anyway). Two feature
@@ -171,8 +172,12 @@ sources/* ── Match objects ──> prioritise ──> render
 - **Overs use cricket decimal notation** (`7.3` = 7 overs 3 balls, not 7.5).
   Convert with `winprob.state.overs_to_balls`; never treat `overs % 1` as a
   fraction of an over.
-- **Win-probability labelling is a hard requirement** — output must never imply
-  it's WinViz or an official figure. Keep the "estimate, not WinViz" note.
+- **Win probability must never be presented as WinViz or an official figure.**
+  The per-match console explainer (method tag + basis lines) has been removed by
+  preference, so the bars now stand alone — but don't ever *label* them as WinViz
+  / official. The "home-grown estimate, not WinViz" honesty lives in the README's
+  Win-probability section, and the `WinEstimate.method`/`note` fields are still
+  carried in the model and exposed in `--json`.
 - The win-prob model artifact is pickled, so unpickling needs scikit-learn
   installed; `estimator._load_model` swallows the ImportError and returns None
   (→ heuristic). Keep that graceful path.
