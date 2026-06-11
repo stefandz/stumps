@@ -71,6 +71,7 @@ stumps --results 3      # also show the last 3 days of followed/domestic results
 stumps --no-results     # only today's matches (don't look back)
 stumps --all            # include every match, not just ones of interest
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
+stumps --refresh 30 --notify   # + desktop alert on a wicket/result for your team
 stumps --demo           # built-in sample data (offline; great for a quick look)
 stumps --test-model     # use the trained multi-day model for Tests (opt-in)
 stumps train            # train the limited-overs chase model from Cricsheet

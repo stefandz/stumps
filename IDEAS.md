@@ -5,15 +5,12 @@ Candidate next features for `stumps`, recorded after the core product
 complete. None built yet — ordered by how well they fit the existing
 architecture.
 
-## 1. Notifications during `--refresh`
+## 1. Notifications during `--refresh` — DONE
 
-Turn the refresh loop into an ambient companion: a desktop notification (or
-terminal bell) on a **wicket** or a **result** for your followed teams.
-
-- Mostly a dedupe-and-notify layer over the existing `--refresh` loop.
-- `Ball.is_wicket` is already captured in `recent_balls`, and result detection
-  is solid, so the inputs exist.
-- Opt-in via `--notify`. Modest effort.
+A desktop notification (or terminal bell) on a **wicket** or a **result** for
+your followed teams. Opt-in via `--notify` with `--refresh`. Implemented in
+`notify.py` (`detect_events` diffs followed matches between refreshes,
+baseline-on-first-sight; `send` uses `notify-send`, else a bell).
 
 ## 2. Tournament standings / points tables
 

@@ -58,6 +58,8 @@ class Preferences:
 
     # D — output
     json_output: bool = False
+    #: Desktop notifications for wickets/results of followed teams during --refresh.
+    notify: bool = False
 
     @classmethod
     def resolve(cls, args, config: dict | None = None) -> "Preferences":
@@ -121,4 +123,5 @@ class Preferences:
             prefs.results_days = max(0, args.results)
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
+        prefs.notify = getattr(args, "notify", False)
         return prefs

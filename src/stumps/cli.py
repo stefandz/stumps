@@ -109,6 +109,9 @@ def _show_parser() -> argparse.ArgumentParser:
                    help="skip fetching detailed batting/bowling figures")
     o.add_argument("--refresh", type=int, metavar="SECONDS", default=None,
                    help="redraw every SECONDS until interrupted")
+    o.add_argument("--notify", action="store_true",
+                   help="desktop notification on a wicket/result for your "
+                        "followed teams (with --refresh)")
     o.add_argument("--width", type=int, default=None, help="force console width")
     return p
 
@@ -143,6 +146,7 @@ def _run_show(args: argparse.Namespace) -> int:
     settings.region = prefs.region
     console = Console(width=args.width, no_color=args.plain)
     agg = Aggregator(settings, demo_only=args.demo)
+    notify_state: dict = {}
 
     def run_once() -> None:
         result = agg.fetch(lookback_days=prefs.results_days)
@@ -158,6 +162,13 @@ def _run_show(args: argparse.Namespace) -> int:
                 m for m, _ in ranked
                 if m.phase.is_active_today or m.phase is Phase.COMPLETE
             ])
+        if prefs.notify:
+            from stumps import notify
+            events, new_state = notify.detect_events(notify_state, ranked)
+            notify_state.clear()
+            notify_state.update(new_state)
+            for event in events:
+                notify.send(event)
         when = datetime.now().strftime("%a %d %b %Y, %H:%M")
         if prefs.json_output:
             print(render_json(result, ranked, settings, prefs, when=when))

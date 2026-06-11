@@ -154,6 +154,11 @@ sources/* ── Match objects ──> prioritise ──> render
   shown only on a finished game; `cli.py` therefore enriches all displayed
   COMPLETE matches (not just multi-day) so the points note is fetched.
 
+- **`notify.py`** — opt-in `--notify` desktop alerts during the `--refresh` loop.
+  `detect_events` is a pure diff of the previous vs current *followed* matches
+  (first sighting = baseline) returning wicket/result notifications; `send` uses
+  `notify-send` if present, else a terminal bell. State lives in `cli._run_show`.
+
 - **`render/console.py`** — all rich output; honours `Preferences` toggles
   (`--compact`, `--no-figures/-winprob/-dls/-commentary`, `--plain`). It
   *computes* the DLS par and win estimate per match (calling `dls`/`winprob`)
