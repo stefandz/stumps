@@ -145,7 +145,8 @@ sources/* ── Match objects ──> prioritise ──> render
   finished games). `--compact` is one clipped line per match, leading with that
   headline. The panel/title/border accent is the tier colour, except a **finished
   match is always framed green** (`_accent` → `_COMPLETE_ACCENT`), matching its
-  ✓ RESULT badge. **`render/json_out.py`** is the `--json` path (stable schema for
+  ✓ RESULT badge. A match listed with no scorecard yet (just a toss, or feed lag)
+  degrades to a muted "No score yet"/"Yet to start" line rather than an empty frame. **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
   fetch → prioritise → enrich (active matches *and finished multi-day games*, to
   respect rate limits) → render (console or JSON).

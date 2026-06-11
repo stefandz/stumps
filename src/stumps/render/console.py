@@ -416,7 +416,9 @@ def _match_panel(
     if headline and headline.strip().lower() not in _GENERIC_STATUS:
         body.append(Text(headline, style="bold"))
 
-    body.append(_scores_line(match))
+    scores = _scores_line(match)
+    if scores.plain.strip():
+        body.append(scores)
 
     # In-play indicators (figures, DLS par, win probability) only make sense
     # while a match is active — live, at a break, or paused at stumps. For a
@@ -448,6 +450,14 @@ def _match_panel(
                            use_multiday_model=prefs.use_multiday_model)
             if est is not None:
                 body.append(_winprob_block(est, accent))
+
+    # A match can be listed before any scorecard exists (just toss, or feed lag).
+    # Show a muted placeholder rather than an empty frame.
+    if not body:
+        note = match.status_text.strip()
+        if not note or note.lower() in _GENERIC_STATUS:
+            note = "No score yet" if match.phase.is_active_today else "Yet to start"
+        body.append(Text(note, style="dim italic"))
 
     title = Text()
     title.append(_phase_badge(match))

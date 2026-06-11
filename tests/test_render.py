@@ -161,6 +161,18 @@ def test_drawn_multiday_panel_shows_match_drawn():
     assert "RESULT" in out  # the ✓ RESULT badge
 
 
+def test_no_data_match_shows_placeholder_not_empty_panel():
+    from stumps.models import Match, Team
+    # A live match listed before any scorecard exists (status just "Live").
+    m = Match(match_id="nd", format=Format.WT20I, phase=Phase.LIVE,
+              teams=[Team("Rwanda Women"), Team("Malawi Women")],
+              status_text="Live", venue="Gahanga", source="demo")
+    out = _render(m, _settings())
+    assert "No score yet" in out
+    # The team names still render in the title.
+    assert "Rwanda Women" in out
+
+
 def test_break_badge_names_the_interval():
     from stumps.models import Match, Team
     from stumps.render.console import _break_badge_label
