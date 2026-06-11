@@ -249,19 +249,22 @@ def test_espn_dismissals_from_matchcards(settings):
     assert dis == {(2, "p1"): "caught wk", (2, "p2"): "not out"}  # batting card only
 
 
-def test_espn_partnerships_from_matchcards(settings):
+def test_espn_partnerships_from_linescore(settings):
+    # Per-innings partnerships live on the linescore (every innings), not the
+    # matchcards card (latest innings only).
     src = EspnSource(settings)
-    p = src._partnerships({"matchcards": [
-        {"headline": "Partnerships", "inningsNumber": "2", "playerDetails": [
-            {"partnershipWicketName": "1st", "partnershipRuns": "0", "partnershipOvers": "0.2",
-             "player1Name": "Sarkar", "player2Name": "Hasan"},
-            {"partnershipWicketName": "2nd", "partnershipRuns": "86", "partnershipOvers": "15.3",
-             "player1Name": "Sarkar", "player2Name": "Shanto"},
-        ]},
-        {"headline": "Batting", "inningsNumber": "2", "playerDetails": []},
-    ]})
-    assert list(p) == [2]
-    assert p[2][1].runs == 86 and p[2][1].wicket == "2nd" and p[2][1].batter2 == "Shanto"
+    ls = {"period": 1, "partnerships": [
+        {"wicketName": "1st", "runs": 0, "overs": 0.2,
+         "batsmen": [{"athlete": {"displayName": "Sarkar"}},
+                     {"athlete": {"displayName": "Hasan"}}]},
+        {"wicketName": "2nd", "runs": 86, "overs": 15.3,
+         "batsmen": [{"athlete": {"displayName": "Sarkar"}},
+                     {"athlete": {"displayName": "Shanto"}}]},
+    ]}
+    p = src._partnerships(ls)
+    assert len(p) == 2
+    assert p[1].runs == 86 and p[1].wicket == "2nd" and p[1].batter2 == "Shanto"
+    assert src._partnerships({}) == []
 
 
 def test_espn_match_info_toss_and_officials(settings):

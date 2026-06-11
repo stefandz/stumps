@@ -378,22 +378,19 @@ class EspnSource(DataSource):
             match.officials = officials
 
     @staticmethod
-    def _partnerships(data: dict) -> dict[int, list[Partnership]]:
-        """innings number -> partnerships, from the `matchcards` Partnerships card
-        (latest innings only, like the batting card)."""
-        out: dict[int, list[Partnership]] = {}
-        for card in data.get("matchcards") or []:
-            if (card.get("headline") or "").lower() != "partnerships":
-                continue
-            rows = [Partnership(
-                wicket=p.get("partnershipWicketName") or "",
-                runs=_to_int(p.get("partnershipRuns")),
-                overs=str(p.get("partnershipOvers") or ""),
-                batter1=p.get("player1Name") or "",
-                batter2=p.get("player2Name") or "",
-            ) for p in card.get("playerDetails") or []]
-            if rows:
-                out[_to_int(card.get("inningsNumber"))] = rows
+    def _partnerships(ls: dict) -> list[Partnership]:
+        """Partnerships for one innings, from its linescore `partnerships` block
+        (present for *every* innings, unlike the `matchcards` card)."""
+        out = []
+        for p in ls.get("partnerships") or []:
+            names = [_dig(b, "athlete", "displayName") or "" for b in p.get("batsmen") or []]
+            out.append(Partnership(
+                wicket=p.get("wicketName") or "",
+                runs=_to_int(p.get("runs")),
+                overs=str(p.get("overs") or ""),
+                batter1=names[0] if len(names) > 0 else "",
+                batter2=names[1] if len(names) > 1 else "",
+            ))
         return out
 
     @staticmethod
@@ -492,7 +489,6 @@ class EspnSource(DataSource):
                         by_period[period] = (c, ls)
 
         dismissals = self._dismissals(data)
-        partnerships = self._partnerships(data)
         innings = []
         for period in sorted(by_period):
             comp_c, ls = by_period[period]
@@ -513,7 +509,7 @@ class EspnSource(DataSource):
                 closed=not is_current,
                 batters=self._batters(rosters, team_name, period, dismissals),
                 bowlers=self._bowlers(rosters, team_name, period),
-                partnerships=partnerships.get(period, []),
+                partnerships=self._partnerships(ls),
             )
             innings.append(inns)
         return innings

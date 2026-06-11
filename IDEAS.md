@@ -21,7 +21,7 @@ record of what was built (and a couple of things deliberately left out).
   (`_league_line`, hidden with `--no-table`).
 - **Single-match detail** (`--match TEXT`) — the full scorecard: every innings,
   every batter in batting order with how-out, every bowler, plus partnerships
-  (latest innings), the toss and the umpires.
+  (every innings), the toss and the umpires.
 - **Notifications** (`--notify` with `--refresh`) — desktop alert / bell on a
   wicket or result for followed teams.
 - **Status-line mode** (`--oneline`) — one plain line for tmux / polybar / a menu
