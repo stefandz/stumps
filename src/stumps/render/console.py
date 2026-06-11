@@ -497,9 +497,22 @@ _PARTNERSHIP_RIGHT = "magenta"
 def _partnerships_block(inns, half: int = 12) -> Group | None:
     """Partnerships as a back-to-back bar: batter 1's runs grow left of a shared
     centre line, batter 2's grow right, scaled to the biggest contribution so
-    the centre line aligns across every row."""
+    the centre line aligns across every row.
+
+    Some matches give the partnership total but not the per-batter split — then
+    we list the stands plainly (no misleading empty bars)."""
     if not inns.partnerships:
         return None
+
+    if not any(p.runs1 or p.runs2 for p in inns.partnerships):
+        rows: list = [Text("Partnerships", style="bold dim")]
+        for p in inns.partnerships:
+            line = Text()
+            line.append(f"{p.wicket:>4}  ", style="bold")
+            line.append(f"{p.runs:>3} ({p.overs:>4})  ", style="dim")
+            line.append(" & ".join(x for x in (p.batter1, p.batter2) if x))
+            rows.append(line)
+        return Group(*rows)
 
     def label(name: str, runs: int) -> str:
         # Surname only, to keep the bar compact and avoid wrapping.

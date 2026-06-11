@@ -215,6 +215,24 @@ def test_match_detail_shows_partnerships():
     assert "Sarkar 39" in out and "Shanto 45" in out and "│" in out
 
 
+def test_partnerships_fall_back_to_plain_list_without_split():
+    # Some feeds give the partnership total but not the per-batter runs; show a
+    # plain list rather than misleading empty bars.
+    from stumps.models import Innings, Match, Partnership, Team
+    from stumps.render.console import render_match_detail
+    m = Match("ps", Format.FIRST_CLASS, [Team("Surrey"), Team("Kent")],
+              phase=Phase.COMPLETE, status_text="Match drawn",
+              innings=[Innings("Surrey", "Kent", 1, 250, 10, 80.0, partnerships=[
+                  Partnership("1st", 27, "9.2", "Rory Burns", "Dom Sibley", runs1=0, runs2=0),
+                  Partnership("4th", 255, "37.0", "Dan Lawrence", "Ollie Pope", runs1=0, runs2=0)])])
+    c = Console(width=84, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "Partnerships" in out
+    assert "Rory Burns & Dom Sibley" in out and "255" in out
+    assert "█" not in out  # no diverging bar when the per-batter split is absent
+
+
 def test_match_detail_shows_toss_and_officials():
     from stumps.models import Match, Team
     from stumps.render.console import render_match_detail
