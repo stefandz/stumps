@@ -206,6 +206,23 @@ def test_espn_completed_captures_winner_flag(settings):
     assert src._event_to_match(drawn, "1", "Series").winner == ""
 
 
+def test_espn_points_from_notes(settings):
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    m = Match("p", Format.FIRST_CLASS, [Team("Surrey"), Team("Hampshire")],
+              phase=Phase.COMPLETE)
+    # Real shape, plus a provisional asterisk that should be stripped.
+    src._apply_points(m, {"notes": [
+        {"type": "toss", "text": "Hampshire elected to field"},
+        {"type": "points", "text": "Surrey 15*, Hampshire 13*"},
+    ]})
+    assert m.points == "Surrey 15, Hampshire 13"
+    # Bilateral series (no points note) -> stays empty.
+    m2 = Match("p2", Format.ODI, [Team("A"), Team("B")], phase=Phase.COMPLETE)
+    src._apply_points(m2, {"notes": [{"type": "toss", "text": "A elected to bat"}]})
+    assert m2.points == ""
+
+
 def test_espn_multiday_timing_from_notes(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

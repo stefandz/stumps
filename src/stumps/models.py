@@ -189,6 +189,7 @@ class Match:
     result_text: str = ""  # populated when COMPLETE
     winner: str = ""        # winning team name when COMPLETE; "" if drawn/unknown
     finished_on: str = ""   # ISO date a recent result finished (recent-results fetch)
+    points: str = ""        # league/tournament points awarded, e.g. "Surrey 15, Hampshire 13"
     venue: str = ""
     innings: list[Innings] = field(default_factory=list)
     # Multi-day context

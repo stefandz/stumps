@@ -161,6 +161,17 @@ def test_drawn_multiday_panel_shows_match_drawn():
     assert "RESULT" in out  # the ✓ RESULT badge
 
 
+def test_points_shown_for_completed_league_game():
+    import dataclasses
+    m = _completed_test(winner="England")
+    m = dataclasses.replace(m, points="England 19, Australia 4")
+    out = _render(m, _settings())
+    assert "Points" in out and "England 19, Australia 4" in out
+    # Not shown while the match is still in progress.
+    live = dataclasses.replace(m, phase=Phase.LIVE)
+    assert "England 19, Australia 4" not in _render(live, _settings())
+
+
 def test_finished_label_relative_days():
     from datetime import date, timedelta
     from stumps.render.console import _finished_label

@@ -264,11 +264,25 @@ class EspnSource(DataSource):
         innings = self._innings_from_summary(data)
         if innings:
             match.innings = innings
+        self._apply_points(match, data)
         if match.format.is_multi_day:
             self._apply_multiday_timing(match, data)
         if match.ball_by_ball_available and match.phase.is_active_today:
             match.recent_balls = self._recent_balls(match.match_id)
         return match
+
+    @staticmethod
+    def _apply_points(match: Match, data: dict) -> None:
+        """League/tournament points awarded, from the summary `notes` (type
+        `points`, e.g. "Surrey 15, Hampshire 13"). Present for any points-based
+        competition — county championship, the various first-class leagues,
+        round-robin limited-overs — and absent for bilateral series."""
+        for note in data.get("notes") or []:
+            if note.get("type") == "points":
+                text = (note.get("text") or "").replace("*", "").strip()
+                if text:
+                    match.points = text
+                return
 
     @staticmethod
     def _winner_name(competitors: list[dict]) -> str:

@@ -19,12 +19,14 @@ terminal bell) on a **wicket** or a **result** for your followed teams.
 
 Answer "where's my team in the table?".
 
-- The ESPN per-event `summary` payload already carries a `standings` block, and
-  county-championship points are in the `notes` (type `points`, e.g.
-  "Surrey 7, Hampshire 5").
-- A `--standings` view, or a footer on tournament/championship matches.
-- Data is already in hand. Medium effort (probe the `standings`/`points` shapes
-  first, as with the multi-day-timing and recent-results work).
+- **Done:** per-match **points awarded** are now shown on finished
+  league/tournament games (`Match.points`, from the summary `notes` type
+  `points`) across county championship and the first-class / limited-overs
+  leagues worldwide.
+- **Still open:** the full **standings / points table** — the ESPN per-event
+  `summary` payload also carries a `standings` block. A `--standings` view (or a
+  table appended to a tournament match) would show the whole league position.
+  Medium effort (probe the `standings` shape first).
 
 ## 3. Single-match detail / drill-down
 

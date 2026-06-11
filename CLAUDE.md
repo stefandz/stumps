@@ -147,6 +147,13 @@ sources/* ── Match objects ──> prioritise ──> render
     90 for Tests), falling back to a mid-day prior. The B model trains on a
     days-based proxy for the same quantity. Both are labelled "rough"/an estimate.
 
+- **League/tournament points** (`Match.points`) come from the summary `notes`
+  (type `points`, e.g. "Surrey 15, Hampshire 13"), parsed by `espn._apply_points`
+  for *any* points-based competition — county championship, the first-class and
+  limited-overs leagues worldwide — and absent for bilateral series. They're
+  shown only on a finished game; `cli.py` therefore enriches all displayed
+  COMPLETE matches (not just multi-day) so the points note is fetched.
+
 - **`render/console.py`** — all rich output; honours `Preferences` toggles
   (`--compact`, `--no-figures/-winprob/-dls/-commentary`, `--plain`). It
   *computes* the DLS par and win estimate per match (calling `dls`/`winprob`)

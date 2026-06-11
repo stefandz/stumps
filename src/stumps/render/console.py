@@ -432,6 +432,15 @@ def _match_panel(
     if scores.plain.strip():
         body.append(scores)
 
+    # Points awarded, for a finished league/tournament game (county championship,
+    # the various first-class/limited-overs leagues — anywhere the feed tracks a
+    # table). Absent for bilateral series.
+    if match.phase is Phase.COMPLETE and match.points:
+        pts = Text()
+        pts.append("Points  ", style="bold")
+        pts.append(match.points, style="dim")
+        body.append(pts)
+
     # In-play indicators (figures, DLS par, win probability) only make sense
     # while a match is active — live, at a break, or paused at stumps. For a
     # finished match the result is already on the status line, and showing a

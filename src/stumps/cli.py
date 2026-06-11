@@ -149,14 +149,14 @@ def _run_show(args: argparse.Namespace) -> int:
         ranked = prioritise(result.matches, prefs)
         if not args.no_enrich:
             # Fetch detailed scorecards for matches we'll show figures for (live /
-            # break / stumps) and for finished multi-day games — whose scoreboard
-            # score string collapses to one innings per side ("421 & 259/5d"), so
-            # only enrichment recovers the full innings list. Upcoming and finished
-            # limited-overs games don't need it (conserving the cricketdata quota).
+            # break / stumps) and for finished ones — multi-day games need it to
+            # recover the full innings list (the scoreboard collapses "421 &
+            # 259/5d" to one innings per side), and any finished league game needs
+            # it for the points awarded (only in the per-event summary). Upcoming
+            # games don't need it.
             agg.enrich(result, [
                 m for m, _ in ranked
-                if m.phase.is_active_today
-                or (m.phase is Phase.COMPLETE and m.format.is_multi_day)
+                if m.phase.is_active_today or m.phase is Phase.COMPLETE
             ])
         when = datetime.now().strftime("%a %d %b %Y, %H:%M")
         if prefs.json_output:

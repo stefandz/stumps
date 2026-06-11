@@ -21,7 +21,9 @@ drawn", "Match tied") once a game is finished — current
 **batting & bowling figures**, the **last few balls** of commentary (with wickets
 and boundaries flagged), a **DLS par score** in limited-overs games (a "are they
 ahead or behind?" indicator), end-of-day / stumps summaries for multi-day games,
-and a **win-probability estimate**.
+the **points awarded** for finished league/tournament games (county championship
+and the first-class / limited-overs leagues worldwide), and a
+**win-probability estimate**.
 
 ```
 $ stumps
