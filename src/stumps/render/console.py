@@ -728,11 +728,15 @@ def render_match_detail(
         fow = _fall_of_wickets_line(inns)
         if fow is not None:
             body.append(fow)
+        # Blank lines between the batting+fall block, the bowling card and the
+        # partnerships so the innings doesn't read as one dense slab.
         bowl = _bowling_table(inns, full=True)
         if bowl is not None:
+            body.append(Text(""))
             body.append(bowl)
         pship = _partnerships_block(inns)
         if pship is not None:
+            body.append(Text(""))
             body.append(pship)
 
     if match.phase.is_active_today:
