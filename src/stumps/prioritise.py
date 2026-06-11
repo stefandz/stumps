@@ -205,7 +205,8 @@ def _passes_tier(match: Match, cls: Classification, prefs: Preferences) -> bool:
     ):
         if match.phase.is_active_today:
             return True
-        if match.phase is Phase.COMPLETE and not prefs.core_results_only:
+        if (match.phase in (Phase.COMPLETE, Phase.ABANDONED)
+                and not prefs.core_results_only):
             return True
     return False
 

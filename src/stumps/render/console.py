@@ -684,9 +684,6 @@ def _match_panel(
     )
 
 
-_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}
-
-
 def render_match_detail(
     console: Console, match: Match, cls: Classification, settings,
     prefs: Preferences,
@@ -717,7 +714,7 @@ def render_match_detail(
 
     for inns in match.innings:
         body.append(Text(""))  # spacer between innings
-        head = Text(f"{_ORDINALS.get(inns.number, str(inns.number))} innings — "
+        head = Text(f"{_ordinal(inns.number)} innings — "
                     f"{inns.batting_team} {inns.score}", style=f"bold {accent}")
         if inns.overs and not inns.all_out:
             head.append(f"  ({inns.overs:.1f} ov)", style="dim")

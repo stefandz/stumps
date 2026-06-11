@@ -85,10 +85,12 @@ class Aggregator:
     @staticmethod
     def _merge(current: list[Match], fetcher, days: int) -> list[Match]:
         """Append matches from a past/future fetcher that aren't already in the
-        live list (which wins on conflicts, being the freshest)."""
+        live list (which wins on conflicts, being the freshest). A failure here
+        only loses the addendum — never the live result — so swallow anything,
+        not just SourceError (the reverse-engineered feed can raise on odd shapes)."""
         try:
             extra = fetcher(days)
-        except SourceError:
+        except Exception:
             return current
         seen = {m.match_id for m in current}
         return current + [m for m in extra if m.match_id not in seen]

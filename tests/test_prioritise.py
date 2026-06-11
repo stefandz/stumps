@@ -136,6 +136,9 @@ def test_finished_full_member_international_lingers_by_default():
     assert [m for m, _ in prioritise([done])] == [done]
     # --core-results opts out: history is then your core teams only.
     assert prioritise([done], Preferences(core_results_only=True)) == []
+    # An abandoned marquee international lingers too (not just COMPLETE).
+    aband = _match(Format.T20I, "Bilateral", "Australia", "Zimbabwe", phase=Phase.ABANDONED)
+    assert [m for m, _ in prioritise([aband])] == [aband]
     # A finished *associate* game never lingers (would flood history).
     assoc = _match(Format.WT20I, "Kwibuka Women's T20", "Rwanda Women",
                    "Malawi Women", phase=Phase.COMPLETE)

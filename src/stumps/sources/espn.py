@@ -564,7 +564,11 @@ class EspnSource(DataSource):
             # every innings), then to a bare "out" for a dismissed batter.
             how = dismissals.get((period, pid)) or _expand_card(
                 st.get("dismissalCard"), _to_int(st.get("fielderKeeper")))
-            dismissed = _to_int(st.get("outs")) > 0
+            # matchcards may report "not out" — that's a not-out signal, not a
+            # how-out — so clear it. A real how-out also means dismissed, in case
+            # the `outs` stat is missing.
+            how = "" if how == "not out" else how
+            dismissed = _to_int(st.get("outs")) > 0 or bool(how)
             batter = Batter(
                 name=_dig(entry, "athlete", "displayName") or "?",
                 runs=_to_int(st.get("runs")),

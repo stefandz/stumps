@@ -429,6 +429,18 @@ def test_aggregator_falls_back_to_demo(settings, monkeypatch):
     assert any("cricinfo unavailable" in n for n in result.notices)
 
 
+def test_aggregator_merge_survives_addendum_error():
+    # A failing recent/upcoming fetcher must lose only the addendum, not the
+    # whole live result.
+    from stumps.models import Format, Match, Team
+    live = [Match("a", Format.ODI, [Team("X"), Team("Y")])]
+
+    def boom(days):
+        raise KeyError("odd payload shape")
+
+    assert Aggregator._merge(live, boom, 2) == live
+
+
 def test_aggregator_serves_last_good_snapshot_when_offline(settings, monkeypatch):
     from stumps.models import Format, Match, Phase, Team
 
