@@ -52,6 +52,7 @@ class Preferences:
     show_winprob: bool = True
     show_dls: bool = True
     show_commentary: bool = True
+    show_standings: bool = False  # append league tables (--standings)
     balls: int = 6
     #: Use the trained multi-day Test/first-class model instead of the heuristic.
     use_multiday_model: bool = False
@@ -115,6 +116,7 @@ class Preferences:
         prefs.show_winprob = not getattr(args, "no_winprob", False)
         prefs.show_dls = not getattr(args, "no_dls", False)
         prefs.show_commentary = not getattr(args, "no_commentary", False)
+        prefs.show_standings = getattr(args, "standings", False)
         if getattr(args, "balls", None) is not None:
             prefs.balls = args.balls
         if getattr(args, "no_results", False):

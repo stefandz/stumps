@@ -67,6 +67,7 @@ stumps --compact        # one line per match
 stumps --json           # machine-readable output (status bars, widgets, scripts)
 stumps --live-only --format t20       # filter what's shown
 stumps --womens-only    # or --mens-only
+stumps --standings      # append the league/points table for each competition
 stumps --results 3      # also show the last 3 days of followed/domestic results
 stumps --no-results     # only today's matches (don't look back)
 stumps --all            # include every match, not just ones of interest

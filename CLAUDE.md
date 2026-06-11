@@ -152,7 +152,11 @@ sources/* ── Match objects ──> prioritise ──> render
   for *any* points-based competition — county championship, the first-class and
   limited-overs leagues worldwide — and absent for bilateral series. They're
   shown only on a finished game; `cli.py` therefore enriches all displayed
-  COMPLETE matches (not just multi-day) so the points note is fetched.
+  COMPLETE matches (not just multi-day) so the points note is fetched. The full
+  **league table** is opt-in (`--standings`): `espn._apply_standings` parses the
+  summary `standings` block (`children[].standings.entries[]`, pre-ranked, points
+  from `matchPoints`) into `Match.standings`, and `render_report` appends one
+  `_standings_panel` per distinct competition shown.
 
 - **`notify.py`** — opt-in `--notify` desktop alerts during the `--refresh` loop.
   `detect_events` is a pure diff of the previous vs current *followed* matches

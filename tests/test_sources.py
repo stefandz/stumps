@@ -223,6 +223,30 @@ def test_espn_points_from_notes(settings):
     assert m2.points == ""
 
 
+def test_espn_standings_from_summary(settings):
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    m = Match("s", Format.FIRST_CLASS, [Team("Surrey"), Team("Kent")],
+              phase=Phase.COMPLETE, series_name="County Championship Division One")
+    data = {"standings": {"name": "County Championship Division One", "children": [
+        {"standings": {"entries": [
+            {"team": {"displayName": "Nottinghamshire", "abbreviation": "NOT"},
+             "stats": [{"name": "rank", "value": 1}, {"name": "matchesPlayed", "value": 6},
+                       {"name": "matchesWon", "value": 2}, {"name": "matchesLost", "value": 0},
+                       {"name": "matchesDraw", "value": 4}, {"name": "matchPoints", "value": 91}]},
+            {"team": {"displayName": "Surrey"},
+             "stats": [{"name": "rank", "value": 2}, {"name": "matchPoints", "value": 89}]},
+        ]}}]}}
+    src._apply_standings(m, data)
+    assert m.standings.name == "County Championship Division One"
+    assert [r.team for r in m.standings.rows] == ["Nottinghamshire", "Surrey"]
+    assert m.standings.rows[0].points == 91 and m.standings.rows[0].won == 2
+    # No standings block in the payload -> stays None.
+    m2 = Match("s2", Format.ODI, [Team("A"), Team("B")])
+    src._apply_standings(m2, {})
+    assert m2.standings is None
+
+
 def test_espn_multiday_timing_from_notes(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

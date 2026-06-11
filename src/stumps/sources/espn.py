@@ -20,7 +20,9 @@ import re
 from typing import Any
 
 from stumps import config
-from stumps.models import Ball, Batter, Bowler, Format, Innings, Match, Phase, Team
+from stumps.models import (
+    Ball, Batter, Bowler, Format, Innings, Match, Phase, Standings, StandingsRow, Team,
+)
 from stumps.sources.base import DataSource, DiskCache, SourceError
 
 _SCOREBOARD = (
@@ -265,6 +267,7 @@ class EspnSource(DataSource):
         if innings:
             match.innings = innings
         self._apply_points(match, data)
+        self._apply_standings(match, data)
         if match.format.is_multi_day:
             self._apply_multiday_timing(match, data)
         if match.ball_by_ball_available and match.phase.is_active_today:
@@ -283,6 +286,38 @@ class EspnSource(DataSource):
                 if text:
                     match.points = text
                 return
+
+    @staticmethod
+    def _apply_standings(match: Match, data: dict) -> None:
+        """Parse the league/division table from the summary `standings` block:
+        `children[].standings.entries[]`, each an entry with a `team` and a list
+        of named `stats` (rank, matchesPlayed, matchesWon/Lost/Draw, matchPoints).
+        Entries arrive pre-ranked. Generic across competitions and formats."""
+        block = data.get("standings") or {}
+        children = block.get("children") or []
+        entries: list[dict] = []
+        for child in children:
+            entries = (child.get("standings") or {}).get("entries") or []
+            if entries:
+                break  # the event's own group (one per division in practice)
+        if not entries:
+            return
+
+        rows: list[StandingsRow] = []
+        for entry in entries:
+            stats = {s.get("name"): s.get("value") for s in entry.get("stats") or []}
+            team = _dig(entry, "team", "displayName") or _dig(entry, "team", "abbreviation") or "?"
+            rows.append(StandingsRow(
+                rank=_to_int(stats.get("rank")),
+                team=team,
+                played=_to_int(stats.get("matchesPlayed")),
+                won=_to_int(stats.get("matchesWon")),
+                lost=_to_int(stats.get("matchesLost")),
+                drawn=_to_int(stats.get("matchesDraw")),
+                points=_to_int(stats.get("matchPoints")),
+            ))
+        match.standings = Standings(name=block.get("name") or match.series_name,
+                                    rows=rows)
 
     @staticmethod
     def _winner_name(competitors: list[dict]) -> str:

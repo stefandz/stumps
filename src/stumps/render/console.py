@@ -17,7 +17,7 @@ from rich.text import Text
 
 from stumps import dls
 from stumps.dls.par import G50_ASSOCIATE_OR_WOMENS_ODI, G50_FULL_MEMBER
-from stumps.models import Format, Match, Phase
+from stumps.models import Format, Match, Phase, Standings
 from stumps.options import Preferences
 from stumps.prioritise import Classification, Tier
 from stumps.sources.aggregator import FetchResult
@@ -416,6 +416,20 @@ def _compact_line(match: Match, cls: Classification) -> Text:
     return line
 
 
+def _standings_panel(standings: Standings, accent: str) -> Panel:
+    t = Table(box=None, show_header=True, header_style="bold dim",
+              padding=(0, 2), pad_edge=False)
+    t.add_column("#", justify="right")
+    t.add_column("Team")
+    for col in ("P", "W", "L", "D", "Pts"):
+        t.add_column(col, justify="right")
+    for row in standings.rows:
+        t.add_row(str(row.rank), row.team, str(row.played), str(row.won),
+                  str(row.lost), str(row.drawn), Text(str(row.points), style="bold"))
+    return Panel(t, title=Text(standings.name, style=f"bold {accent}"),
+                 title_align="left", border_style=accent, padding=(0, 1))
+
+
 def _match_panel(
     match: Match, cls: Classification, settings, prefs: Preferences
 ) -> Panel:
@@ -531,3 +545,11 @@ def render_report(
                           overflow="ellipsis")
         else:
             console.print(_match_panel(match, cls, settings, prefs))
+
+    if prefs.show_standings:
+        seen: set[str] = set()
+        for match, cls in ranked:
+            table = match.standings
+            if table and table.rows and table.name not in seen:
+                seen.add(table.name)
+                console.print(_standings_panel(table, _accent(match, cls)))

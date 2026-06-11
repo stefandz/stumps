@@ -161,6 +161,42 @@ def test_drawn_multiday_panel_shows_match_drawn():
     assert "RESULT" in out  # the ✓ RESULT badge
 
 
+def test_standings_panel_renders():
+    from rich.console import Console
+    from stumps.models import Standings, StandingsRow
+    from stumps.render.console import _standings_panel
+    s = Standings("County Championship Division One", [
+        StandingsRow(1, "Nottinghamshire", 6, 2, 0, 4, 91),
+        StandingsRow(2, "Surrey", 7, 1, 1, 5, 89)])
+    c = Console(width=80, record=True)
+    c.print(_standings_panel(s, "green4"))
+    out = c.export_text()
+    assert "County Championship Division One" in out
+    assert "Nottinghamshire" in out and "91" in out
+
+
+def test_standings_shown_once_per_competition_with_flag():
+    import dataclasses
+    from stumps.models import Standings, StandingsRow
+    table = Standings("County Championship Division One",
+                      [StandingsRow(1, "Surrey", 6, 3, 0, 3, 90)])
+    m1 = dataclasses.replace(_completed_test(winner="England"),
+                             match_id="a", standings=table)
+    m2 = dataclasses.replace(_completed_test(winner="England"),
+                             match_id="b", standings=table)
+    result, _, settings = _ranked_demo()
+    ranked = [(m1, classify(m1)), (m2, classify(m2))]
+    console = Console(width=90, record=True)
+    render_report(console, result, ranked, settings, Preferences(show_standings=True))
+    out = console.export_text()
+    # The shared table is printed once, not once per match.
+    assert out.count("County Championship Division One") == 1
+    # ...and not at all without the flag.
+    console2 = Console(width=90, record=True)
+    render_report(console2, result, ranked, settings, Preferences(show_standings=False))
+    assert "County Championship Division One" not in console2.export_text()
+
+
 def test_points_shown_for_completed_league_game():
     import dataclasses
     m = _completed_test(winner="England")

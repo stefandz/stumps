@@ -176,6 +176,25 @@ class Innings:
 
 
 @dataclass
+class StandingsRow:
+    rank: int
+    team: str
+    played: int = 0
+    won: int = 0
+    lost: int = 0
+    drawn: int = 0
+    points: int = 0
+
+
+@dataclass
+class Standings:
+    """A league/division table for the competition a match belongs to."""
+
+    name: str
+    rows: list[StandingsRow] = field(default_factory=list)
+
+
+@dataclass
 class Match:
     """A single match, normalised across sources."""
 
@@ -190,6 +209,7 @@ class Match:
     winner: str = ""        # winning team name when COMPLETE; "" if drawn/unknown
     finished_on: str = ""   # ISO date a recent result finished (recent-results fetch)
     points: str = ""        # league/tournament points awarded, e.g. "Surrey 15, Hampshire 13"
+    standings: Standings | None = None  # league table for this competition (--standings)
     venue: str = ""
     innings: list[Innings] = field(default_factory=list)
     # Multi-day context

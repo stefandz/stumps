@@ -12,18 +12,17 @@ your followed teams. Opt-in via `--notify` with `--refresh`. Implemented in
 `notify.py` (`detect_events` diffs followed matches between refreshes,
 baseline-on-first-sight; `send` uses `notify-send`, else a bell).
 
-## 2. Tournament standings / points tables
+## 2. Tournament standings / points tables — DONE
 
 Answer "where's my team in the table?".
 
-- **Done:** per-match **points awarded** are now shown on finished
-  league/tournament games (`Match.points`, from the summary `notes` type
-  `points`) across county championship and the first-class / limited-overs
-  leagues worldwide.
-- **Still open:** the full **standings / points table** — the ESPN per-event
-  `summary` payload also carries a `standings` block. A `--standings` view (or a
-  table appended to a tournament match) would show the whole league position.
-  Medium effort (probe the `standings` shape first).
+- Per-match **points awarded** show on finished league/tournament games
+  (`Match.points`, from the summary `notes` type `points`).
+- The full **standings table** is opt-in via `--standings`: `espn._apply_standings`
+  parses the summary `standings` block (`children[].standings.entries[]`, ranked,
+  points from `matchPoints`) into `Match.standings`, and `render` appends one
+  table per distinct competition shown (`_standings_panel`). Generic across
+  county championship and the first-class / limited-overs leagues worldwide.
 
 ## 3. Single-match detail / drill-down
 
