@@ -1,55 +1,40 @@
 # Ideas
 
-Feature backlog for `stumps`. The original five-idea backlog is built; this now
-tracks what's done and what's still open.
+Feature backlog for `stumps`. Everything proposed has shipped — this is now a
+record of what was built (and a couple of things deliberately left out).
 
-## Done
+## Shipped
 
 - **Recent results** (`--results N` / `--no-results`) — finished games from the
   last N days for the teams you care about, tagged "Today"/"Yesterday", pulled
   in even after they drop off the live feed.
-- **Points awarded** — finished league/tournament games show the points earned
-  (`Match.points`, from the summary `notes` type `points`).
-- **Standings** — `--standings` appends the full league table per competition
-  (`espn._apply_standings` → `Match.standings`, `_standings_panel`); each league
-  match also shows its two teams' positions inline by default (`_league_line`,
-  hidden with `--no-table`).
-- **Notifications** (`--notify` with `--refresh`) — desktop alert / bell on a
-  wicket or result for followed teams (`notify.detect_events`/`send`).
-- **Single-match detail** (`--match TEXT`) — full scorecard: every innings, every
-  batter with how-out, every bowler (`render_match_detail`; `full=True` tables).
-- **Status-line mode** (`--oneline`) — one plain line for tmux/polybar/menu bars.
-- **Offline last-good cache** — serve the last successful fetch (≤12h) when live
-  sources fail, stamped "cached (as of …)" (`Aggregator._save/_load_snapshot`).
 - **Keep notable internationals in history** — a full-member international shown
   live lingers briefly after it finishes (symmetric catch-all in `_passes_tier`,
   bounded by `--results`); `--core-results` keeps history to your core teams.
+- **Upcoming fixtures** (`--upcoming N`, default 3 days) — your teams' scheduled
+  games with a local "Starts …" time, soonest-first (`fetch_upcoming`).
+- **Points awarded** — finished league/tournament games show the points earned
+  (`Match.points`, from the summary `notes`).
+- **Standings** (`--standings`) — the full league table per competition, columns
+  adapting to format (draws for multi-day; NRR + a Q marker for limited-overs).
+  Each league match also shows its two teams' positions inline by default
+  (`_league_line`, hidden with `--no-table`).
+- **Single-match detail** (`--match TEXT`) — the full scorecard: every innings,
+  every batter in batting order with how-out, every bowler, plus partnerships
+  (latest innings), the toss and the umpires.
+- **Notifications** (`--notify` with `--refresh`) — desktop alert / bell on a
+  wicket or result for followed teams.
+- **Status-line mode** (`--oneline`) — one plain line for tmux / polybar / a menu
+  bar (prefers a match in play, else the top recent result).
+- **Offline last-good cache** — serve the last successful fetch (≤12h) when live
+  sources fail, stamped "cached (as of …)".
 
-## Open
+## Deliberately not done
 
-### 7. Upcoming fixtures view — DONE
-
-Forward-looking mirror of recent results. `fetch_upcoming(days)` queries the
-header at future `&dates=`, and core teams' scheduled games show with a "Starts
-<local time>" line (`_local_start`), soonest-first. Default 3 days
-(`upcoming_days`, `--upcoming N`; `--no-upcoming` skips the fetch entirely).
-Tier-scoped for free (the catch-all is live/finished only, so non-core upcoming
-games don't leak in).
-
-### 8. Net run rate + qualification in `--standings` — DONE
-
-`--standings` tables now adapt to format: multi-day tables show a draws (D)
-column, limited-overs tables show **NRR** (signed) instead, and a **Q** marker
-flags qualified teams. `StandingsRow` gained `nrr`/`qualified`; parsed in
-`espn._apply_standings`, rendered conditionally in `_standings_panel`.
-
-### 9. Richer `--match` detail (leaders / toss / player of the match)
-
-The per-event `summary` we already fetch carries unused blocks — `leaders` (top
-run-scorers / wicket-takers), the toss (`notes`), `gameInfo`, player-of-the-match.
-Surfacing these in the drill-down makes `--match` the full picture. Low–medium.
-
-### 10. Fall of wickets / partnerships
-
-The biggest depth win for the scorecard, but contingent on a payload probe to
-confirm the data is present in `summary` before committing. Stretch goal.
+- **Full "c Fielder b Bowler" dismissals** — the summary scorecard only carries
+  the dismissal *mode* ("caught", "bowled", …), which is what `--match` shows.
+  The full text would mean scraping every page of ball-by-ball commentary
+  (~25 pages for an ODI, far more for a Test) per match — too heavy.
+- **Player of the match** — not present in the summary payload.
+- **Top-performer "leaders" block** — available, but redundant with the full
+  scorecard the `--match` view already shows.
