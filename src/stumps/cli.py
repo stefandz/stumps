@@ -98,7 +98,9 @@ def _show_parser() -> argparse.ArgumentParser:
     c.add_argument("--no-dls", action="store_true", help="hide DLS par")
     c.add_argument("--no-commentary", action="store_true", help="hide recent balls")
     c.add_argument("--standings", action="store_true",
-                   help="append the league/points table for each competition shown")
+                   help="append the full league/points table for each competition shown")
+    c.add_argument("--no-table", action="store_true",
+                   help="hide the inline league positions of the two teams")
     c.add_argument("--balls", type=int, default=None, metavar="N",
                    help="how many recent balls to show (default 6)")
     c.add_argument("--test-model", action="store_true",

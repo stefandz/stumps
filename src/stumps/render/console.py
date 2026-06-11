@@ -124,6 +124,36 @@ def _subtitle(match: Match) -> Text:
     return Text(" · ".join(bits), style="dim")
 
 
+def _ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _league_line(match: Match) -> Text | None:
+    """Where the match's two teams currently sit in their league table — e.g.
+    "Surrey 2nd (89 pts) · Hampshire 9th (53 pts)". None unless we have standings
+    that include them (bilateral series and knockouts won't)."""
+    table = match.standings
+    if not table or not table.rows:
+        return None
+    parts = []
+    for team in match.teams:
+        row = next((r for r in table.rows
+                    if r.team.lower() in team.name.lower()
+                    or team.name.lower() in r.team.lower()), None)
+        if row:
+            parts.append(f"{team.name} {_ordinal(row.rank)} ({row.points} pts)")
+    if not parts:
+        return None
+    txt = Text()
+    txt.append("League  ", style="bold")
+    txt.append(" · ".join(parts), style="dim")
+    return txt
+
+
 def _scores_line(match: Match) -> Text:
     txt = Text()
     for i, inns in enumerate(match.innings):
@@ -485,6 +515,11 @@ def _match_panel(
         pts.append(match.points, style="dim")
         body.append(pts)
 
+    if prefs.show_table:
+        league = _league_line(match)
+        if league is not None:
+            body.append(league)
+
     # In-play indicators (figures, DLS par, win probability) only make sense
     # while a match is active — live, at a break, or paused at stumps. For a
     # finished match the result is already on the status line, and showing a
@@ -561,6 +596,10 @@ def render_match_detail(
         pts.append("Points  ", style="bold")
         pts.append(match.points, style="dim")
         body.append(pts)
+    if prefs.show_table:
+        league = _league_line(match)
+        if league is not None:
+            body.append(league)
 
     for inns in match.innings:
         body.append(Text(""))  # spacer between innings

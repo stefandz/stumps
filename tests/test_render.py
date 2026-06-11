@@ -197,6 +197,38 @@ def test_match_detail_shows_full_scorecard():
     assert "England won by 20 runs" in out
 
 
+def _match_with_standings(phase=Phase.LIVE):
+    from stumps.models import Innings, Match, Standings, StandingsRow, Team
+    return Match(
+        "lx", Format.FIRST_CLASS, [Team("Surrey"), Team("Hampshire")], phase=phase,
+        status_text="Surrey lead", innings=[Innings("Surrey", "Hampshire", 1, 120, 3, 40.0)],
+        standings=Standings("County Championship Division One", [
+            StandingsRow(2, "Surrey", 7, 1, 1, 5, 89),
+            StandingsRow(9, "Hampshire", 7, 1, 4, 2, 53),
+        ]))
+
+
+def test_ordinal():
+    from stumps.render.console import _ordinal
+    assert [_ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22)] == \
+        ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd"]
+
+
+def test_inline_league_line_format():
+    from stumps.render.console import _league_line
+    line = _league_line(_match_with_standings()).plain
+    assert "Surrey 2nd (89 pts)" in line and "Hampshire 9th (53 pts)" in line
+    assert line.index("Surrey") < line.index("Hampshire")  # panel team order
+
+
+def test_inline_league_positions_default_on_and_optout():
+    m = _match_with_standings()
+    out = _render(m, _settings())
+    assert "League" in out and "Surrey 2nd (89 pts)" in out
+    # --no-table hides it.
+    assert "League" not in _render(m, _settings(), Preferences(show_table=False))
+
+
 def test_standings_panel_renders():
     from rich.console import Console
     from stumps.models import Standings, StandingsRow

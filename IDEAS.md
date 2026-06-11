@@ -23,6 +23,9 @@ Answer "where's my team in the table?".
   points from `matchPoints`) into `Match.standings`, and `render` appends one
   table per distinct competition shown (`_standings_panel`). Generic across
   county championship and the first-class / limited-overs leagues worldwide.
+- **Inline league positions** (default-on): each league match shows where its two
+  teams sit — `League  Surrey 2nd (89 pts) · Hampshire 9th (53 pts)`
+  (`_league_line`). Hidden with `--no-table`.
 
 ## 3. Single-match detail / drill-down — DONE
 

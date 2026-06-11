@@ -158,7 +158,9 @@ sources/* ── Match objects ──> prioritise ──> render
   **league table** is opt-in (`--standings`): `espn._apply_standings` parses the
   summary `standings` block (`children[].standings.entries[]`, pre-ranked, points
   from `matchPoints`) into `Match.standings`, and `render_report` appends one
-  `_standings_panel` per distinct competition shown.
+  `_standings_panel` per distinct competition shown. By default (no flag) each
+  league match also shows its two teams' positions inline via `_league_line`
+  ("Surrey 2nd (89 pts) · …"); `--no-table` hides that.
 
 - **`notify.py`** — opt-in `--notify` desktop alerts during the `--refresh` loop.
   `detect_events` is a pure diff of the previous vs current *followed* matches
