@@ -197,6 +197,19 @@ def test_match_detail_shows_full_scorecard():
     assert "England won by 20 runs" in out
 
 
+def test_match_detail_shows_toss_and_officials():
+    from stumps.models import Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("d2", Format.ODI, [Team("A"), Team("B")], phase=Phase.COMPLETE,
+              status_text="A won", toss="A, elected to bat first",
+              officials=["U Mpire", "T V Umpire"])
+    c = Console(width=80, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "Toss" in out and "elected to bat first" in out
+    assert "Umpires" in out and "U Mpire" in out and "T V Umpire" in out
+
+
 def _match_with_standings(phase=Phase.LIVE):
     from stumps.models import Innings, Match, Standings, StandingsRow, Team
     return Match(

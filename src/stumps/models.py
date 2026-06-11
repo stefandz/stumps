@@ -213,6 +213,8 @@ class Match:
     starts_at: str = ""     # ISO UTC start time (used for upcoming fixtures)
     points: str = ""        # league/tournament points awarded, e.g. "Surrey 15, Hampshire 13"
     standings: Standings | None = None  # league table for this competition (--standings)
+    toss: str = ""          # e.g. "Australia, elected to bat first"
+    officials: list[str] = field(default_factory=list)  # match umpires/referee
     venue: str = ""
     innings: list[Innings] = field(default_factory=list)
     # Multi-day context

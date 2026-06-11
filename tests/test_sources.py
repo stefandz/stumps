@@ -249,6 +249,18 @@ def test_espn_dismissals_from_matchcards(settings):
     assert dis == {(2, "p1"): "caught wk", (2, "p2"): "not out"}  # batting card only
 
 
+def test_espn_match_info_toss_and_officials(settings):
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    m = Match("mi", Format.ODI, [Team("Australia"), Team("Bangladesh")], phase=Phase.COMPLETE)
+    src._apply_match_info(m, {
+        "notes": [{"type": "toss", "text": "Australia , elected to bat first"}],
+        "gameInfo": {"officials": [{"displayName": "Ahsan Raza"}, {"displayName": "Alex Wharf"}]},
+    })
+    assert m.toss == "Australia, elected to bat first"  # stray space before comma fixed
+    assert m.officials == ["Ahsan Raza", "Alex Wharf"]
+
+
 def test_espn_standings_from_summary(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

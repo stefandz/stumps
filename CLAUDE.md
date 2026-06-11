@@ -71,7 +71,9 @@ sources/* ── Match objects ──> prioritise ──> render
     ordered by `battingPosition`; how-out text is the dismissal *mode* ("caught
     wk", "bowled", …) from the `matchcards` scorecard (latest innings only) with
     a fallback to the roster `dismissalCard` abbreviation (`_expand_card`) — the
-    full "c Fielder b Bowler" isn't in the summary (it'd need commentary). The header also
+    full "c Fielder b Bowler" isn't in the summary (it'd need commentary). The
+    toss (`notes`) and match officials (`gameInfo`) are parsed by
+    `_apply_match_info` and shown in the `--match` detail. The header also
     accepts `&dates=YYYYMMDD` (one date, **no ranges**), so `fetch_recent_results`
     makes one cached call per past day and stamps finished games with
     `Match.finished_on` (most-recent date wins) — the renderer turns that into a

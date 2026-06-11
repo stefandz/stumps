@@ -638,6 +638,11 @@ def render_match_detail(
         league = _league_line(match)
         if league is not None:
             body.append(league)
+    if match.toss:
+        toss = Text()
+        toss.append("Toss  ", style="bold")
+        toss.append(match.toss, style="dim")
+        body.append(toss)
 
     for inns in match.innings:
         body.append(Text(""))  # spacer between innings
@@ -668,6 +673,12 @@ def render_match_detail(
         recent = _recent_balls_block(match, prefs.balls)
         if recent is not None:
             body.append(recent)
+
+    if match.officials:
+        umpires = Text()
+        umpires.append("Umpires  ", style="bold")
+        umpires.append(" · ".join(match.officials), style="dim")
+        body.append(umpires)
 
     if not body:
         body.append(Text("No score yet", style="dim italic"))

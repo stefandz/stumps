@@ -307,6 +307,7 @@ class EspnSource(DataSource):
             match.innings = innings
         self._apply_points(match, data)
         self._apply_standings(match, data)
+        self._apply_match_info(match, data)
         if match.format.is_multi_day:
             self._apply_multiday_timing(match, data)
         if match.ball_by_ball_available and match.phase.is_active_today:
@@ -360,6 +361,20 @@ class EspnSource(DataSource):
             ))
         match.standings = Standings(name=block.get("name") or match.series_name,
                                     rows=rows)
+
+    @staticmethod
+    def _apply_match_info(match: Match, data: dict) -> None:
+        """Toss (from `notes`) and match officials (from `gameInfo`)."""
+        for note in data.get("notes") or []:
+            if note.get("type") == "toss":
+                toss = (note.get("text") or "").replace(" ,", ",").strip()
+                if toss:
+                    match.toss = toss
+                break
+        officials = [o.get("displayName") for o in _dig(data, "gameInfo", "officials") or []
+                     if o.get("displayName")]
+        if officials:
+            match.officials = officials
 
     @staticmethod
     def _winner_name(competitors: list[dict]) -> str:
