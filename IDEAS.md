@@ -1,7 +1,8 @@
 # Ideas
 
-Feature backlog for `stumps`. Everything proposed has shipped — this is now a
-record of what was built (and a couple of things deliberately left out).
+Feature backlog for `stumps`. The core product is built and feels fully
+featured; this tracks what shipped, what's deliberately out, and a few candidate
+next steps (mostly health/consolidation rather than new features).
 
 ## Shipped
 
@@ -19,16 +20,46 @@ record of what was built (and a couple of things deliberately left out).
   adapting to format (draws for multi-day; NRR + a Q marker for limited-overs).
   Each league match also shows its two teams' positions inline by default
   (`_league_line`, hidden with `--no-table`).
-- **Single-match detail** (`--match TEXT`) — the full scorecard: every innings,
-  every batter in batting order with how-out, every bowler, plus partnerships
-  (every innings, as a back-to-back bar of each batter's runs on a shared centre
-  line), the toss and the umpires.
+- **Single-match detail** (`--match TEXT`, separator-tolerant "v"/"vs") — the
+  full scorecard: every innings, every batter in batting order with how-out, the
+  fall of wickets, every bowler, partnerships (a back-to-back bar of each
+  batter's runs on a shared centre line, falling back to a plain list when the
+  per-batter split is absent), the toss and the umpires.
 - **Notifications** (`--notify` with `--refresh`) — desktop alert / bell on a
   wicket or result for followed teams.
 - **Status-line mode** (`--oneline`) — one plain line for tmux / polybar / a menu
   bar (prefers a match in play, else the top recent result).
 - **Offline last-good cache** — serve the last successful fetch (≤12h) when live
   sources fail, stamped "cached (as of …)".
+
+## Candidate next steps
+
+Mostly consolidation rather than new features — in rough priority order.
+
+### Health / consolidation
+
+- **`cricketdata.org` fallback has fallen behind.** Everything rich we added
+  (winner flag, points, standings, partnerships, fall of wickets, multi-day
+  timing, recent results, upcoming fixtures) is ESPN-only. If ESPN 403s and we
+  fall back, the experience drops to bare scores. Decide consciously: accept it
+  as a deliberately-degraded backstop (and document), or close some of the gap.
+- **Config defaults for the newer toggles.** `results_days`/`upcoming_days` read
+  from config; `notify`, `standings`, `core_results` don't. Wire them so they
+  stick without flags.
+
+### Small features
+
+- **`--match` + `--refresh` as a "watch this game" mode.** The refresh loop
+  already honours `--match`; confirm it works and document it as a feature.
+- **Tab-completion for `--match`** (team names), alongside the existing
+  `--team`/`--region`/`--domestic` completion.
+- **Run-rate worm / over-by-over sparkline** for a chase — the data shape
+  supports it, and it'd pair with the win-probability bar.
+
+### Diminishing returns
+
+- County ball-by-ball (not in the free feed), a better-trained Test model (needs
+  data work), notifications beyond wicket/result.
 
 ## Deliberately not done
 
