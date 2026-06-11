@@ -34,12 +34,12 @@ mode. Works with `--json` too (emits just that match).
 
 Possible later: fall of wickets / partnerships (not parsed yet).
 
-## 4. Status-line / one-liner mode
+## 4. Status-line / one-liner mode — DONE
 
-`stumps --oneline` → one ultra-compact line for tmux / polybar / a menu bar,
-e.g. `🏏 ENG 250/4 (45) v AUS — req 71 off 72`.
-
-- Complements `--json`. Low effort; becomes a daily-driver.
+`stumps --oneline` prints one plain-text line (no panels/ANSI/enrich) for the
+top match — preferring one in play, falling back to the top recent result —
+e.g. `🏏 NZ 280/8  IND 210/4 — India require 71 runs from 12.0 overs`. For tmux /
+polybar / a menu bar. `oneline()` in `render/console.py`.
 
 ## 5. Offline last-good cache
 

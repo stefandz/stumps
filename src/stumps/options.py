@@ -61,6 +61,8 @@ class Preferences:
 
     # D — output
     json_output: bool = False
+    #: Single plain status line for the top match (tmux / polybar / menu bar).
+    oneline: bool = False
     #: Desktop notifications for wickets/results of followed teams during --refresh.
     notify: bool = False
 
@@ -128,5 +130,6 @@ class Preferences:
             prefs.results_days = max(0, args.results)
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
+        prefs.oneline = getattr(args, "oneline", False)
         prefs.notify = getattr(args, "notify", False)
         return prefs

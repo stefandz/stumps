@@ -65,6 +65,7 @@ stumps --team india     # follow India instead (repeatable: --team eng --team au
 stumps --region in --domestic india   # tune coverage + your home domestic scene
 stumps --compact        # one line per match
 stumps --json           # machine-readable output (status bars, widgets, scripts)
+stumps --oneline        # one plain status line for the top match (tmux/polybar)
 stumps --live-only --format t20       # filter what's shown
 stumps --womens-only    # or --mens-only
 stumps --match england  # drill into one match: the full scorecard (all innings)

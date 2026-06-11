@@ -109,6 +109,9 @@ def _show_parser() -> argparse.ArgumentParser:
 
     o = p.add_argument_group("output / data")
     o.add_argument("--json", action="store_true", help="machine-readable JSON output")
+    o.add_argument("--oneline", action="store_true",
+                   help="print a single status line for the top match "
+                        "(for tmux / polybar / a menu bar)")
     o.add_argument("--demo", action="store_true",
                    help="use built-in sample data (offline)")
     o.add_argument("--no-enrich", action="store_true",
@@ -176,6 +179,14 @@ def _run_show(args: argparse.Namespace) -> int:
             run_detail(result, prefs.match_query)
             return
         ranked = prioritise(result.matches, prefs)
+        if prefs.oneline:
+            from stumps.render.console import oneline
+            # Prefer a match in play; fall back to the top match (e.g. a recent
+            # result) when nothing's live.
+            pick = next((m for m, _ in ranked if m.phase.is_active_today),
+                        ranked[0][0] if ranked else None)
+            print(oneline(pick) if pick else "🏏 no matches")
+            return
         if not args.no_enrich:
             # Fetch detailed scorecards for matches we'll show figures for (live /
             # break / stumps) and for finished ones — multi-day games need it to

@@ -161,6 +161,17 @@ def test_drawn_multiday_panel_shows_match_drawn():
     assert "RESULT" in out  # the ✓ RESULT badge
 
 
+def test_oneline_format():
+    from stumps.render.console import oneline
+    live = next(x for x in sample_matches() if x.match_id == "demo-ind-nz-wc")
+    s = oneline(live)
+    assert s.startswith("🏏") and " — " in s   # scores then a headline
+    assert "India" in s or "IND" in s
+    # A finished game leads with its result.
+    done = next(x for x in sample_matches() if x.phase is Phase.COMPLETE)
+    assert "South Africa" in oneline(done)
+
+
 def test_match_detail_shows_full_scorecard():
     from stumps.models import Batter, Bowler, Innings, Match, Team
     from stumps.render.console import render_match_detail

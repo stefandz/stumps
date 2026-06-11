@@ -136,6 +136,28 @@ def _scores_line(match: Match) -> Text:
     return txt
 
 
+def _short_name(match: Match, team_name: str) -> str:
+    for t in match.teams:
+        if t.name.lower() in team_name.lower() or team_name.lower() in t.name.lower():
+            return t.short_name
+    return team_name.split()[0] if team_name else "?"
+
+
+def oneline(match: Match) -> str:
+    """A single plain-text status line for the top match — for tmux / polybar /
+    a menu bar. No panels, colour or markup; uses team abbreviations."""
+    if match.innings:
+        scores = "  ".join(
+            f"{_short_name(match, i.batting_team)} {i.score}" for i in match.innings)
+    else:
+        scores = " v ".join(t.short_name for t in match.teams)
+    out = f"🏏 {scores}"
+    headline = _headline(match)
+    if headline and headline.strip().lower() not in _GENERIC_STATUS:
+        out += f" — {headline}"
+    return out
+
+
 def _figures_table(section: str) -> Table:
     """A figures table whose header row doubles as the column legend, with the
     section name ('Batting'/'Bowling') sitting over the player-name column."""
