@@ -267,6 +267,18 @@ def test_espn_partnerships_from_linescore(settings):
     assert src._partnerships({}) == []
 
 
+def test_espn_fall_of_wickets_from_linescore(settings):
+    src = EspnSource(settings)
+    fow = src._fall_of_wickets({"fow": [
+        {"wicketNumber": 2, "runs": 53, "wicketOver": 17.3,
+         "athlete": {"displayName": "Will Jacks"}},
+        {"wicketNumber": 1, "runs": 27, "wicketOver": 9.2,
+         "athlete": {"displayName": "Rory Burns"}},
+    ]})
+    assert [w.wicket for w in fow] == [1, 2]  # sorted by wicket number
+    assert fow[0].team_runs == 27 and fow[0].batter == "Rory Burns" and fow[0].over == "9.2"
+
+
 def test_espn_match_info_toss_and_officials(settings):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)

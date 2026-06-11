@@ -92,9 +92,9 @@ and *output*.
 
 `--match TEXT` picks a single match (a case-insensitive substring of the teams
 or series — "v" and "vs" both work, e.g. `--match "england vs india"`) and shows
-the **full scorecard**: every innings in batting order with how-out, full bowling
-figures, partnerships drawn as a back-to-back bar of each batter's runs on a
-shared centre line, plus the toss and the umpires.
+the **full scorecard**: every innings in batting order with how-out, the fall of
+wickets, full bowling figures, partnerships drawn as a back-to-back bar of each
+batter's runs on a shared centre line, plus the toss and the umpires.
 
 ```
 $ stumps --match "england v india"
@@ -109,6 +109,7 @@ $ stumps --match "england v india"
 │ H Brook            31    22      2/1    141    lbw                     │
 │ L Livingstone *    28    16      1/2    175    not out                 │
 │ J Bairstow *       12    15      1/0     80    not out                 │
+│ Fall  1-98 (Salt, 10.2) · 2-142 (Buttler, 14.3) · 3-182 (Brook, 19.5)  │
 │ Bowling             O    M     R    W    Econ                          │
 │ J Bumrah          4.0    0    28    2     7.0                          │
 │ K Yadav           4.0    0    33    2     8.2                          │

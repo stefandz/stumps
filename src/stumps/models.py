@@ -156,6 +156,14 @@ class Partnership:
 
 
 @dataclass
+class FallOfWicket:
+    wicket: int        # wicket number (1..)
+    team_runs: int = 0  # team score when it fell
+    over: str = ""      # over at the fall, e.g. "9.2"
+    batter: str = ""    # the batter dismissed
+
+
+@dataclass
 class Innings:
     batting_team: str
     bowling_team: str = ""
@@ -171,6 +179,7 @@ class Innings:
     batters: list[Batter] = field(default_factory=list)
     bowlers: list[Bowler] = field(default_factory=list)
     partnerships: list[Partnership] = field(default_factory=list)
+    fall_of_wickets: list[FallOfWicket] = field(default_factory=list)
 
     @property
     def score(self) -> str:

@@ -21,8 +21,8 @@ from typing import Any
 
 from stumps import config
 from stumps.models import (
-    Ball, Batter, Bowler, Format, Innings, Match, Partnership, Phase, Standings,
-    StandingsRow, Team,
+    Ball, Batter, Bowler, FallOfWicket, Format, Innings, Match, Partnership, Phase,
+    Standings, StandingsRow, Team,
 )
 from stumps.sources.base import DataSource, DiskCache, SourceError
 
@@ -400,6 +400,19 @@ class EspnSource(DataSource):
         return out
 
     @staticmethod
+    def _fall_of_wickets(ls: dict) -> list[FallOfWicket]:
+        """Fall of wickets for one innings, from its linescore `fow` block —
+        populated for every innings of every match type (incl. county)."""
+        out = [FallOfWicket(
+            wicket=_to_int(f.get("wicketNumber")),
+            team_runs=_to_int(f.get("runs")),
+            over=str(f.get("wicketOver") or ""),
+            batter=_dig(f, "athlete", "displayName") or "",
+        ) for f in ls.get("fow") or []]
+        out.sort(key=lambda w: w.wicket)
+        return out
+
+    @staticmethod
     def _winner_name(competitors: list[dict]) -> str:
         """The name of the competitor flagged `winner`, or '' (drawn/tied/none)."""
         for c in competitors:
@@ -516,6 +529,7 @@ class EspnSource(DataSource):
                 batters=self._batters(rosters, team_name, period, dismissals),
                 bowlers=self._bowlers(rosters, team_name, period),
                 partnerships=self._partnerships(ls),
+                fall_of_wickets=self._fall_of_wickets(ls),
             )
             innings.append(inns)
         return innings

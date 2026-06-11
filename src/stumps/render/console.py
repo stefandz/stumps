@@ -489,6 +489,22 @@ def _compact_line(match: Match, cls: Classification) -> Text:
     return line
 
 
+def _fall_of_wickets_line(inns) -> Text | None:
+    """Classic fall-of-wickets line: "Fall  1-27 (Burns, 9.2) · 2-53 …"."""
+    if not inns.fall_of_wickets:
+        return None
+    line = Text()
+    line.append("Fall  ", style="bold")
+    for i, w in enumerate(inns.fall_of_wickets):
+        if i:
+            line.append(" · ", style="dim")
+        line.append(f"{w.wicket}-{w.team_runs}")
+        detail = [x for x in (w.batter.split()[-1] if w.batter else "", w.over) if x]
+        if detail:
+            line.append(f" ({', '.join(detail)})", style="dim")
+    return line
+
+
 #: Colours for the two batters in a partnership's diverging bar.
 _PARTNERSHIP_LEFT = "cyan"
 _PARTNERSHIP_RIGHT = "magenta"
@@ -709,6 +725,9 @@ def render_match_detail(
         bat = _batting_table(inns, full=True)
         if bat is not None:
             body.append(bat)
+        fow = _fall_of_wickets_line(inns)
+        if fow is not None:
+            body.append(fow)
         bowl = _bowling_table(inns, full=True)
         if bowl is not None:
             body.append(bowl)

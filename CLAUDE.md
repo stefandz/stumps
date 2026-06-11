@@ -201,9 +201,11 @@ sources/* ── Match objects ──> prioritise ──> render
   `render_match_detail` (`cli._find_match` selects it, tolerating "vs"/"vs." for
   the "v" separator) — the full scorecard (every innings, all batters with
   how-out, all bowlers; the figure tables take a `full=True` mode), plus
-  partnerships (every innings, from each innings' linescore `partnerships`,
-  rendered as a back-to-back bar of each batter's runs on a shared centre line),
-  the toss and the umpires.
+  a fall-of-wickets line (every innings, from the linescore `fow` — populated
+  even for county games), partnerships (every innings, from the linescore
+  `partnerships`, as a back-to-back bar of each batter's runs on a shared centre
+  line — falling back to a plain list when the per-batter split is absent), the
+  toss and the umpires.
   **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
   fetch (`lookback_days=prefs.results_days`) → prioritise → enrich (active matches

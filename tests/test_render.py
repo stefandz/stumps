@@ -215,6 +215,20 @@ def test_match_detail_shows_partnerships():
     assert "Sarkar 39" in out and "Shanto 45" in out and "│" in out
 
 
+def test_match_detail_shows_fall_of_wickets():
+    from stumps.models import FallOfWicket, Innings, Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("fw", Format.ODI, [Team("A"), Team("B")], phase=Phase.COMPLETE,
+              status_text="A won",
+              innings=[Innings("A", "B", 1, 250, 3, 50.0, fall_of_wickets=[
+                  FallOfWicket(1, 27, "9.2", "Rory Burns"),
+                  FallOfWicket(2, 53, "17.3", "Will Jacks")])])
+    c = Console(width=90, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "Fall" in out and "1-27 (Burns, 9.2)" in out and "2-53 (Jacks, 17.3)" in out
+
+
 def test_partnerships_fall_back_to_plain_list_without_split():
     # Some feeds give the partnership total but not the per-batter runs; show a
     # plain list rather than misleading empty bars.
