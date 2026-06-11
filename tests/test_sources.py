@@ -314,6 +314,50 @@ def test_aggregator_demo_only_mode(settings):
     assert not result.used_fallback
 
 
+def test_espn_fetch_recent_results(settings, monkeypatch):
+    src = EspnSource(settings)
+
+    def fake_get(url):
+        assert "dates=" in url  # only the dated header is queried here
+        done = _espn_event()
+        done["id"] = "111"
+        done["fullStatus"] = {"type": {"state": "post", "detail": "Final"}}
+        done["competitors"][0]["winner"] = True
+        live = _espn_event()
+        live["id"] = "222"  # state "in" (default) -> not a result
+        return {"sports": [{"leagues": [
+            {"id": "9", "name": "Series", "events": [done, live]}]}]}
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    out = src.fetch_recent_results(2)
+    assert {m.match_id for m in out} == {"111"}  # only the finished match
+    assert out[0].finished_on  # stamped with a date
+    assert src.fetch_recent_results(0) == []  # disabled
+
+
+def test_aggregator_merges_recent_without_duplicates():
+    from stumps.models import Match, Team
+
+    live = [Match("a", Format.ODI, [Team("X"), Team("Y")], phase=Phase.LIVE)]
+    recent = [
+        Match("a", Format.ODI, [Team("X"), Team("Y")], phase=Phase.COMPLETE),
+        Match("b", Format.TEST, [Team("P"), Team("Q")], phase=Phase.COMPLETE),
+    ]
+
+    class _Src:
+        def fetch_recent_results(self, days):
+            return recent
+
+    merged = Aggregator._with_recent(_Src(), live, 2)
+    # Live "a" is kept (freshest); the recent duplicate is dropped; "b" is added.
+    assert [m.match_id for m in merged] == ["a", "b"]
+    assert merged[0].phase is Phase.LIVE
+
+
+def test_datasource_recent_default_is_empty(settings):
+    assert DemoSource(settings).fetch_recent_results(5) == []
+
+
 def test_demo_source_has_england_and_chase(settings):
     matches = DemoSource(settings).fetch_current_matches()
     assert any("England" in t for m in matches for t in m.team_names)

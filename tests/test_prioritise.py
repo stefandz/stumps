@@ -151,3 +151,17 @@ def test_filter_womens_only():
 def test_limit_applied():
     ranked = prioritise(sample_matches(), Preferences(limit=2))
     assert len(ranked) == 2
+
+
+def test_results_days_resolution():
+    from types import SimpleNamespace
+    # Default: one day of past results.
+    assert Preferences.resolve(SimpleNamespace()).results_days == 1
+    # Explicit lookback.
+    assert Preferences.resolve(SimpleNamespace(results=3)).results_days == 3
+    # Disable.
+    assert Preferences.resolve(SimpleNamespace(no_results=True)).results_days == 0
+    # Config default, overridden by flag.
+    assert Preferences.resolve(SimpleNamespace(), {"results_days": 4}).results_days == 4
+    assert Preferences.resolve(SimpleNamespace(results=2),
+                               {"results_days": 4}).results_days == 2

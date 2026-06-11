@@ -161,6 +161,28 @@ def test_drawn_multiday_panel_shows_match_drawn():
     assert "RESULT" in out  # the ✓ RESULT badge
 
 
+def test_finished_label_relative_days():
+    from datetime import date, timedelta
+    from stumps.render.console import _finished_label
+    m = _completed_test(winner="England")
+    m.finished_on = ""  # in the live feed as finished -> Today
+    assert _finished_label(m) == "Today"
+    m.finished_on = (date.today() - timedelta(days=1)).isoformat()
+    assert _finished_label(m) == "Yesterday"
+    m.finished_on = (date.today() - timedelta(days=3)).isoformat()
+    assert _finished_label(m) not in ("Today", "Yesterday", "")  # a weekday label
+    # A live match has no finished label.
+    live = next(x for x in sample_matches() if x.match_id == "demo-ind-nz-wc")
+    assert _finished_label(live) == ""
+
+
+def test_finished_label_shown_in_subtitle():
+    from datetime import date, timedelta
+    m = _completed_test(winner="England")
+    m.finished_on = (date.today() - timedelta(days=1)).isoformat()
+    assert "Yesterday" in _render(m, _settings())
+
+
 def test_no_data_match_shows_placeholder_not_empty_panel():
     from stumps.models import Match, Team
     # A live match listed before any scorecard exists (status just "Live").

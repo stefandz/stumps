@@ -114,18 +114,47 @@ class EspnSource(DataSource):
 
     def fetch_current_matches(self) -> list[Match]:
         data = self._get(_SCOREBOARD)
-        sports = data.get("sports") or []
-        if not sports:
+        if not (data.get("sports") or []):
             raise SourceError("ESPN scoreboard returned no sports (shape changed?)")
-        matches: list[Match] = []
-        for league in sports[0].get("leagues") or []:
-            league_id = str(league.get("id") or "")
-            series_name = league.get("name") or ""
-            for event in league.get("events") or []:
-                matches.append(self._event_to_match(event, league_id, series_name))
+        matches = self._parse_scoreboard(data)
         if not matches:
             raise SourceError("ESPN scoreboard listed no matches")
         return matches
+
+    def _parse_scoreboard(self, data: dict) -> list[Match]:
+        matches: list[Match] = []
+        for sport in data.get("sports") or []:
+            for league in sport.get("leagues") or []:
+                league_id = str(league.get("id") or "")
+                series_name = league.get("name") or ""
+                for event in league.get("events") or []:
+                    matches.append(
+                        self._event_to_match(event, league_id, series_name))
+        return matches
+
+    def fetch_recent_results(self, days: int) -> list[Match]:
+        """Finished matches from the header for each of the last ``days`` dates.
+
+        The header accepts `&dates=YYYYMMDD` (one date only — no ranges), so we
+        make one cached call per day. A match appearing on several days keeps the
+        most recent date as its `finished_on` (we walk oldest → newest)."""
+        if days <= 0:
+            return []
+        from datetime import date, timedelta
+
+        today = date.today()
+        recent: dict[str, Match] = {}
+        for delta in range(days, 0, -1):  # oldest first
+            day = today - timedelta(days=delta)
+            try:
+                data = self._get(f"{_SCOREBOARD}&dates={day:%Y%m%d}")
+            except SourceError:
+                continue
+            for match in self._parse_scoreboard(data):
+                if match.phase is Phase.COMPLETE:
+                    match.finished_on = day.isoformat()
+                    recent[match.match_id] = match
+        return list(recent.values())
 
     def _event_to_match(self, event: dict, league_id: str, series_name: str) -> Match:
         cls = event.get("class") or {}

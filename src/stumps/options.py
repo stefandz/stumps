@@ -42,6 +42,9 @@ class Preferences:
     include_all: bool = False
     tier_floor: int = 2  # show followed + premier + domestic by default
     limit: int | None = None
+    #: How many past days of finished results to pull in (followed/domestic/
+    #: premier only); 0 disables. Default surfaces yesterday's results.
+    results_days: int = 1
 
     # C — display
     compact: bool = False
@@ -69,6 +72,8 @@ class Preferences:
         prefs.region = config.get("region", prefs.region)
         if "domestic" in config:
             prefs.domestic = resolve_domestic_key(config["domestic"])
+        if "results_days" in config:
+            prefs.results_days = int(config["results_days"])
 
         # CLI overrides
         if getattr(args, "team", None):
@@ -110,6 +115,10 @@ class Preferences:
         prefs.show_commentary = not getattr(args, "no_commentary", False)
         if getattr(args, "balls", None) is not None:
             prefs.balls = args.balls
+        if getattr(args, "no_results", False):
+            prefs.results_days = 0
+        elif getattr(args, "results", None) is not None:
+            prefs.results_days = max(0, args.results)
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
         return prefs

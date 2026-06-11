@@ -188,6 +188,7 @@ class Match:
     status_text: str = ""  # the headline summary line, e.g. "England need 120"
     result_text: str = ""  # populated when COMPLETE
     winner: str = ""        # winning team name when COMPLETE; "" if drawn/unknown
+    finished_on: str = ""   # ISO date a recent result finished (recent-results fetch)
     venue: str = ""
     innings: list[Innings] = field(default_factory=list)
     # Multi-day context

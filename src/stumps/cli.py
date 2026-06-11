@@ -81,6 +81,11 @@ def _show_parser() -> argparse.ArgumentParser:
                    help="treat World Cup warm-ups/qualifiers as premier")
     b.add_argument("--limit", type=int, default=None,
                    help="cap the number of matches shown")
+    b.add_argument("--results", type=int, metavar="DAYS", default=None,
+                   help="include finished results from the last DAYS days for "
+                        "followed/domestic/premier matches (default 1)")
+    b.add_argument("--no-results", action="store_true",
+                   help="don't pull in past days' results (only today's)")
 
     c = p.add_argument_group("display")
     c.add_argument("--compact", action="store_true", help="one line per match")
@@ -140,7 +145,7 @@ def _run_show(args: argparse.Namespace) -> int:
     agg = Aggregator(settings, demo_only=args.demo)
 
     def run_once() -> None:
-        result = agg.fetch()
+        result = agg.fetch(lookback_days=prefs.results_days)
         ranked = prioritise(result.matches, prefs)
         if not args.no_enrich:
             # Fetch detailed scorecards for matches we'll show figures for (live /

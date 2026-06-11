@@ -43,6 +43,15 @@ class DataSource(ABC):
         """
         return match
 
+    def fetch_recent_results(self, days: int) -> list[Match]:
+        """Finished matches from each of the last ``days`` days (excluding today,
+        which `fetch_current_matches` already covers), stamped with `finished_on`.
+
+        Lets the app surface results that have aged out of the live feed. Default
+        is none — only sources that can query past dates override this.
+        """
+        return []
+
 
 class DiskCache:
     """Tiny TTL cache for raw JSON payloads, keyed by an opaque string.

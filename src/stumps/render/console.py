@@ -8,6 +8,7 @@ chases, and a win-probability bar — labelled as an estimate, not WinViz.
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -89,8 +90,31 @@ def _phase_badge(match: Match) -> Text:
     return Text(f" {label} ", style=style)
 
 
+def _finished_label(match: Match) -> str:
+    """A relative-day tag for a finished match ("Today"/"Yesterday"/"Sat 07 Jun"),
+    so pulled-in past results read clearly. Empty for matches still in progress."""
+    if match.phase is not Phase.COMPLETE:
+        return ""
+    if not match.finished_on:
+        return "Today"  # in the live feed as finished -> it finished today
+    try:
+        d = date.fromisoformat(match.finished_on)
+    except ValueError:
+        return ""
+    delta = (date.today() - d).days
+    if delta <= 0:
+        return "Today"
+    if delta == 1:
+        return "Yesterday"
+    return d.strftime("%a %d %b")
+
+
 def _subtitle(match: Match) -> Text:
-    bits = [match.format.value]
+    bits = []
+    label = _finished_label(match)
+    if label:
+        bits.append(label)
+    bits.append(match.format.value)
     if match.series_name:
         bits.append(match.series_name)
     if match.venue:

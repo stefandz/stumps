@@ -42,6 +42,13 @@ source: cricinfo
 ╰─ ODI · ICC Cricket World Cup 2027 · Eden Gardens, Kolkata ────────╯
 ```
 
+**Recently-finished results** are shown by default for the matches you care
+about (followed teams + your home domestic + premier games), tagged
+"Today"/"Yesterday". By default that's the last day; `--results N` widens the
+window (one cached fetch per day), `--no-results` turns it off. This pulls in
+games even after they drop off the live feed — so you won't miss yesterday's
+England result.
+
 ## Install
 
 ```bash
@@ -59,6 +66,8 @@ stumps --compact        # one line per match
 stumps --json           # machine-readable output (status bars, widgets, scripts)
 stumps --live-only --format t20       # filter what's shown
 stumps --womens-only    # or --mens-only
+stumps --results 3      # also show the last 3 days of followed/domestic results
+stumps --no-results     # only today's matches (don't look back)
 stumps --all            # include every match, not just ones of interest
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
 stumps --demo           # built-in sample data (offline; great for a quick look)

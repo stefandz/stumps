@@ -49,10 +49,13 @@ sources/* ── Match objects ──> prioritise ──> render
   app branches on. Change this and you touch everything — do it deliberately.
 
 - **`sources/`** — one module per data source, all implementing
-  `DataSource.fetch_current_matches() -> list[Match]` and an optional
-  `enrich(match)` (fetch detailed figures for matches we'll actually show).
+  `DataSource.fetch_current_matches() -> list[Match]`, an optional
+  `enrich(match)` (fetch detailed figures for matches we'll actually show), and
+  an optional `fetch_recent_results(days)` (finished games from past dates).
   `aggregator.py` tries ESPN → cricketdata.org → demo data, in order, returning a
-  `FetchResult`. `fixtures.py` is the offline `DemoSource` and the single source
+  `FetchResult`; `fetch(lookback_days=N)` merges `fetch_recent_results(N)` into
+  the live list (deduped by id, live wins) so results that aged out of the live
+  feed still show. `fixtures.py` is the offline `DemoSource` and the single source
   of sample data for `--demo` and tests.
   - **`espn.py` is the primary source.** It uses ESPN's open API via `curl_cffi`
     with Chrome TLS impersonation — this is *load-bearing*: ESPNcricinfo's CDN
@@ -60,7 +63,13 @@ sources/* ── Match objects ──> prioritise ──> render
     impersonation, so don't try to "simplify" back to httpx/that endpoint. The
     list comes from the scoreboard header; figures + structured innings
     (`linescores` with target) come from the per-event `summary` endpoint, used
-    only to `enrich()` active matches.
+    to `enrich()` active matches (and finished multi-day ones). The header also
+    accepts `&dates=YYYYMMDD` (one date, **no ranges**), so `fetch_recent_results`
+    makes one cached call per past day and stamps finished games with
+    `Match.finished_on` (most-recent date wins) — the renderer turns that into a
+    "Today/Yesterday" tag. Finished games are tier-scoped for free: the
+    live-international catch-all is live-only, so only followed/domestic/premier
+    results survive `prioritise` (no associate-results flood).
   - **The live JSON shapes are reverse-engineered and unstable.** Every field
     access is defensive (`_dig`, `.get`) and degrades to partial data. When a
     live run returns empty/odd data, the fix is almost always in a normaliser
@@ -152,8 +161,10 @@ sources/* ── Match objects ──> prioritise ──> render
   ✓ RESULT badge. A match listed with no scorecard yet (just a toss, or feed lag)
   degrades to a muted "No score yet"/"Yet to start" line rather than an empty frame. **`render/json_out.py`** is the `--json` path (stable schema for
   scripts/widgets). `cli.py` parses args, builds `Preferences`, and orchestrates
-  fetch → prioritise → enrich (active matches *and finished multi-day games*, to
-  respect rate limits) → render (console or JSON).
+  fetch (`lookback_days=prefs.results_days`) → prioritise → enrich (active matches
+  *and finished multi-day games*, to respect rate limits) → render (console or
+  JSON). `results_days` (default 1; `--results N` / `--no-results`) controls how
+  many past days of finished results to pull in.
 
 ## Conventions / gotchas
 

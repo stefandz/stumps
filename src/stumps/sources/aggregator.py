@@ -36,7 +36,7 @@ class Aggregator:
             ]
         self._demo = DemoSource(settings)
 
-    def fetch(self) -> FetchResult:
+    def fetch(self, *, lookback_days: int = 0) -> FetchResult:
         notices: list[str] = []
         for src in self.sources:
             if isinstance(src, CricketDataSource) and not src.available:
@@ -44,9 +44,12 @@ class Aggregator:
                 continue
             try:
                 matches = src.fetch_current_matches()
-                return FetchResult(matches, src, used_fallback=False, notices=notices)
             except SourceError as exc:
                 notices.append(f"{src.name} unavailable: {exc}")
+                continue
+            if lookback_days > 0:
+                matches = self._with_recent(src, matches, lookback_days)
+            return FetchResult(matches, src, used_fallback=False, notices=notices)
 
         # Everything live failed (or we're in demo_only mode and DemoSource is
         # the only source — handled above). Fall back to demo data.
@@ -56,6 +59,17 @@ class Aggregator:
             raise SourceError("Demo source failed: " + "; ".join(notices))
         matches = self._demo.fetch_current_matches()
         return FetchResult(matches, self._demo, used_fallback=True, notices=notices)
+
+    @staticmethod
+    def _with_recent(src: DataSource, current: list[Match], days: int) -> list[Match]:
+        """Append recently-finished results that aren't already in the live feed
+        (which wins on conflicts, being the freshest)."""
+        try:
+            recent = src.fetch_recent_results(days)
+        except SourceError:
+            return current
+        seen = {m.match_id for m in current}
+        return current + [m for m in recent if m.match_id not in seen]
 
     @staticmethod
     def enrich(result: FetchResult, matches: list[Match]) -> None:
