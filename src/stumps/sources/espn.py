@@ -307,6 +307,7 @@ class EspnSource(DataSource):
         for entry in entries:
             stats = {s.get("name"): s.get("value") for s in entry.get("stats") or []}
             team = _dig(entry, "team", "displayName") or _dig(entry, "team", "abbreviation") or "?"
+            qualified = str(stats.get("qualified") or "").upper() in ("Y", "YES", "TRUE", "1")
             rows.append(StandingsRow(
                 rank=_to_int(stats.get("rank")),
                 team=team,
@@ -315,6 +316,8 @@ class EspnSource(DataSource):
                 lost=_to_int(stats.get("matchesLost")),
                 drawn=_to_int(stats.get("matchesDraw")),
                 points=_to_int(stats.get("matchPoints")),
+                nrr=_to_float(stats["netrr"]) if "netrr" in stats else None,
+                qualified=qualified,
             ))
         match.standings = Standings(name=block.get("name") or match.series_name,
                                     rows=rows)

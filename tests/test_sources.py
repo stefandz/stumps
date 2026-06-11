@@ -241,6 +241,19 @@ def test_espn_standings_from_summary(settings):
     assert m.standings.name == "County Championship Division One"
     assert [r.team for r in m.standings.rows] == ["Nottinghamshire", "Surrey"]
     assert m.standings.rows[0].points == 91 and m.standings.rows[0].won == 2
+    assert m.standings.rows[0].nrr is None  # first-class: no NRR
+
+    # Limited-overs entries carry net run rate and a qualification flag.
+    lo = Match("lo", Format.ODI, [Team("USA"), Team("Oman")], phase=Phase.COMPLETE)
+    src._apply_standings(lo, {"standings": {"name": "WC League 2", "children": [
+        {"standings": {"entries": [
+            {"team": {"displayName": "USA"},
+             "stats": [{"name": "rank", "value": 1}, {"name": "matchPoints", "value": 40},
+                       {"name": "netrr", "value": "0.717"}, {"name": "qualified", "value": "Y"}]},
+        ]}}]}})
+    assert lo.standings.rows[0].nrr == 0.717
+    assert lo.standings.rows[0].qualified is True
+
     # No standings block in the payload -> stays None.
     m2 = Match("s2", Format.ODI, [Team("A"), Team("B")])
     src._apply_standings(m2, {})

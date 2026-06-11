@@ -184,6 +184,8 @@ class StandingsRow:
     lost: int = 0
     drawn: int = 0
     points: int = 0
+    nrr: float | None = None  # net run rate (limited-overs tables only)
+    qualified: bool = False   # qualified for the next stage
 
 
 @dataclass

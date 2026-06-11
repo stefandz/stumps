@@ -241,6 +241,22 @@ def test_standings_panel_renders():
     out = c.export_text()
     assert "County Championship Division One" in out
     assert "Nottinghamshire" in out and "91" in out
+    assert "D" in out and "NRR" not in out  # first-class: draws, no NRR
+
+
+def test_standings_panel_limited_overs_shows_nrr_and_qualification():
+    from rich.console import Console
+    from stumps.models import Standings, StandingsRow
+    from stumps.render.console import _standings_panel
+    s = Standings("WC League 2", [
+        StandingsRow(1, "USA", 30, 20, 10, 0, 40, nrr=0.717, qualified=True),
+        StandingsRow(8, "Jersey", 28, 8, 18, 0, 16, nrr=-0.9, qualified=False)])
+    c = Console(width=80, record=True)
+    c.print(_standings_panel(s, "green4"))
+    out = c.export_text()
+    assert "NRR" in out and "+0.717" in out and "-0.900" in out
+    assert "Q" in out          # qualification marker
+    assert " D " not in out    # no draws column for a white-ball table
 
 
 def test_standings_shown_once_per_competition_with_flag():

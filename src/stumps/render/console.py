@@ -477,15 +477,36 @@ def _compact_line(match: Match, cls: Classification) -> Text:
 
 
 def _standings_panel(standings: Standings, accent: str) -> Panel:
+    rows = standings.rows
+    # Multi-day tables have draws; limited-overs tables have a net run rate (and
+    # sometimes qualification flags). Show only the columns that apply.
+    show_draw = any(r.drawn for r in rows)
+    show_nrr = any(r.nrr is not None for r in rows)
+    show_q = any(r.qualified for r in rows)
+
     t = Table(box=None, show_header=True, header_style="bold dim",
               padding=(0, 2), pad_edge=False)
     t.add_column("#", justify="right")
     t.add_column("Team")
-    for col in ("P", "W", "L", "D", "Pts"):
+    for col in ("P", "W", "L"):
         t.add_column(col, justify="right")
-    for row in standings.rows:
-        t.add_row(str(row.rank), row.team, str(row.played), str(row.won),
-                  str(row.lost), str(row.drawn), Text(str(row.points), style="bold"))
+    if show_draw:
+        t.add_column("D", justify="right")
+    t.add_column("Pts", justify="right")
+    if show_nrr:
+        t.add_column("NRR", justify="right")
+
+    for row in rows:
+        team = Text(row.team)
+        if show_q and row.qualified:
+            team.append("  Q", style="bold green")
+        cells = [str(row.rank), team, str(row.played), str(row.won), str(row.lost)]
+        if show_draw:
+            cells.append(str(row.drawn))
+        cells.append(Text(str(row.points), style="bold"))
+        if show_nrr:
+            cells.append(f"{row.nrr:+.3f}" if row.nrr is not None else "—")
+        t.add_row(*cells)
     return Panel(t, title=Text(standings.name, style=f"bold {accent}"),
                  title_align="left", border_style=accent, padding=(0, 1))
 

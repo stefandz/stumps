@@ -35,12 +35,12 @@ can render in local tz. A `--upcoming N` window (or a fixtures section) listing
 followed/domestic/premier teams' next games with date + local start time.
 Reuses the dated-fetch infra. Medium effort.
 
-### 8. Net run rate + qualification in `--standings`
+### 8. Net run rate + qualification in `--standings` — DONE
 
-Limited-overs league tables turn on NRR, which we already parse but don't show
-(entries carry `netrr`, a `qualified` flag, and `for`/`against`). Add an NRR
-column for white-ball tables and a `Q` qualification marker. Low effort;
-completes the standings feature for limited-overs leagues.
+`--standings` tables now adapt to format: multi-day tables show a draws (D)
+column, limited-overs tables show **NRR** (signed) instead, and a **Q** marker
+flags qualified teams. `StandingsRow` gained `nrr`/`qualified`; parsed in
+`espn._apply_standings`, rendered conditionally in `_standings_panel`.
 
 ### 9. Richer `--match` detail (leaders / toss / player of the match)
 

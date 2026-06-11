@@ -160,8 +160,10 @@ sources/* ── Match objects ──> prioritise ──> render
   COMPLETE matches (not just multi-day) so the points note is fetched. The full
   **league table** is opt-in (`--standings`): `espn._apply_standings` parses the
   summary `standings` block (`children[].standings.entries[]`, pre-ranked, points
-  from `matchPoints`) into `Match.standings`, and `render_report` appends one
-  `_standings_panel` per distinct competition shown. By default (no flag) each
+  from `matchPoints`, plus `netrr`/`qualified`) into `Match.standings`, and
+  `render_report` appends one `_standings_panel` per distinct competition shown
+  (columns adapt: multi-day shows draws, limited-overs shows NRR + a Q marker).
+  By default (no flag) each
   league match also shows its two teams' positions inline via `_league_line`
   ("Surrey 2nd (89 pts) · …"); `--no-table` hides that.
 
