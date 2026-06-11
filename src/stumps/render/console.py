@@ -591,48 +591,67 @@ def _standings_panel(standings: Standings, accent: str) -> Panel:
                  title_align="left", border_style=accent, padding=(0, 1))
 
 
+def _labelled(label: str, value: str) -> Text:
+    """A "Label  value" line — bold label, dim value (Points / Toss / Starts /
+    Umpires)."""
+    line = Text()
+    line.append(f"{label}  ", style="bold")
+    line.append(value, style="dim")
+    return line
+
+
+def _headline_line(match: Match) -> Text | None:
+    """The synthesised/source headline, unless it's a bare state word the badge
+    already conveys."""
+    headline = _headline(match)
+    if headline and headline.strip().lower() not in _GENERIC_STATUS:
+        return Text(headline, style="bold")
+    return None
+
+
+def _wrap_panel(match: Match, cls: Classification, body: list) -> Panel:
+    """Frame a body in the standard match panel (badge + title, subtitle, tier
+    border). An empty body becomes a muted placeholder rather than an empty
+    frame (e.g. a match listed before any scorecard exists)."""
+    accent = _accent(match, cls)
+    if not body:
+        note = match.status_text.strip()
+        if not note or note.lower() in _GENERIC_STATUS:
+            note = "No score yet" if match.phase.is_active_today else "Yet to start"
+        body = [Text(note, style="dim italic")]
+    title = Text()
+    title.append(_phase_badge(match))
+    title.append("  ")
+    title.append(match.title, style=f"bold {accent}")
+    return Panel(Group(*body), title=title, title_align="left",
+                 subtitle=_subtitle(match), subtitle_align="left",
+                 border_style=accent, padding=(0, 1))
+
+
 def _match_panel(
     match: Match, cls: Classification, settings, prefs: Preferences
 ) -> Panel:
     accent = _accent(match, cls)
     body: list = []
-
-    # Status headline — synthesised ("require 71 from 12.0 overs", "trail by 245") where we
-    # can, else the source's. Skip bare state words (the badge already says it).
-    headline = _headline(match)
-    if headline and headline.strip().lower() not in _GENERIC_STATUS:
-        body.append(Text(headline, style="bold"))
-
+    hl = _headline_line(match)
+    if hl is not None:
+        body.append(hl)
     if match.phase is Phase.UPCOMING and match.starts_at:
         when = _local_start(match.starts_at)
         if when:
-            starts = Text()
-            starts.append("Starts  ", style="bold")
-            starts.append(when, style="dim")
-            body.append(starts)
-
+            body.append(_labelled("Starts", when))
     scores = _scores_line(match)
     if scores.plain.strip():
         body.append(scores)
-
-    # Points awarded, for a finished league/tournament game (county championship,
-    # the various first-class/limited-overs leagues — anywhere the feed tracks a
-    # table). Absent for bilateral series.
     if match.phase is Phase.COMPLETE and match.points:
-        pts = Text()
-        pts.append("Points  ", style="bold")
-        pts.append(match.points, style="dim")
-        body.append(pts)
-
+        body.append(_labelled("Points", match.points))
     if prefs.show_table:
         league = _league_line(match)
         if league is not None:
             body.append(league)
 
     # In-play indicators (figures, DLS par, win probability) only make sense
-    # while a match is active — live, at a break, or paused at stumps. For a
-    # finished match the result is already on the status line, and showing a
-    # win % for a settled game is just noise. Each is individually toggleable.
+    # while a match is active. Each is individually toggleable.
     if match.phase.is_active_today:
         if prefs.show_figures:
             inns = match.current_innings
@@ -643,45 +662,21 @@ def _match_panel(
                     body.append(bat)
                 if bowl is not None:
                     body.append(bowl)
-
         if prefs.show_dls:
             dls_line = _dls_line(match)
             if dls_line is not None:
                 body.append(dls_line)
-
         if prefs.show_commentary:
             recent = _recent_balls_block(match, prefs.balls)
             if recent is not None:
                 body.append(recent)
-
         if prefs.show_winprob:
             est = estimate(match, settings,
                            use_multiday_model=prefs.use_multiday_model)
             if est is not None:
                 body.append(_winprob_block(est, accent))
 
-    # A match can be listed before any scorecard exists (just toss, or feed lag).
-    # Show a muted placeholder rather than an empty frame.
-    if not body:
-        note = match.status_text.strip()
-        if not note or note.lower() in _GENERIC_STATUS:
-            note = "No score yet" if match.phase.is_active_today else "Yet to start"
-        body.append(Text(note, style="dim italic"))
-
-    title = Text()
-    title.append(_phase_badge(match))
-    title.append("  ")
-    title.append(match.title, style=f"bold {accent}")
-
-    return Panel(
-        Group(*body),
-        title=title,
-        title_align="left",
-        subtitle=_subtitle(match),
-        subtitle_align="left",
-        border_style=accent,
-        padding=(0, 1),
-    )
+    return _wrap_panel(match, cls, body)
 
 
 def render_match_detail(
@@ -694,23 +689,17 @@ def render_match_detail(
     accent = _accent(match, cls)
     body: list = []
 
-    headline = _headline(match)
-    if headline and headline.strip().lower() not in _GENERIC_STATUS:
-        body.append(Text(headline, style="bold"))
+    hl = _headline_line(match)
+    if hl is not None:
+        body.append(hl)
     if match.phase is Phase.COMPLETE and match.points:
-        pts = Text()
-        pts.append("Points  ", style="bold")
-        pts.append(match.points, style="dim")
-        body.append(pts)
+        body.append(_labelled("Points", match.points))
     if prefs.show_table:
         league = _league_line(match)
         if league is not None:
             body.append(league)
     if match.toss:
-        toss = Text()
-        toss.append("Toss  ", style="bold")
-        toss.append(match.toss, style="dim")
-        body.append(toss)
+        body.append(_labelled("Toss", match.toss))
 
     for inns in match.innings:
         body.append(Text(""))  # spacer between innings
@@ -753,21 +742,9 @@ def render_match_detail(
             body.append(recent)
 
     if match.officials:
-        umpires = Text()
-        umpires.append("Umpires  ", style="bold")
-        umpires.append(" · ".join(match.officials), style="dim")
-        body.append(umpires)
+        body.append(_labelled("Umpires", " · ".join(match.officials)))
 
-    if not body:
-        body.append(Text("No score yet", style="dim italic"))
-
-    title = Text()
-    title.append(_phase_badge(match))
-    title.append("  ")
-    title.append(match.title, style=f"bold {accent}")
-    console.print(Panel(Group(*body), title=title, title_align="left",
-                        subtitle=_subtitle(match), subtitle_align="left",
-                        border_style=accent, padding=(0, 1)))
+    console.print(_wrap_panel(match, cls, body))
 
 
 def render_report(
