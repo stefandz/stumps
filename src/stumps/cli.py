@@ -124,6 +124,9 @@ def _show_parser() -> argparse.ArgumentParser:
                    help="append the full league/points table for each competition shown")
     c.add_argument("--no-table", action="store_true",
                    help="hide the inline league positions of the two teams")
+    c.add_argument("--no-gender-labels", action="store_true",
+                   help="don't label paired national sides by gender in the "
+                        "match title (e.g. 'England Men v New Zealand Men')")
     c.add_argument("--balls", type=int, default=None, metavar="N",
                    help="how many recent balls to show (default 6)")
     c.add_argument("--test-model", action="store_true",
@@ -213,7 +216,7 @@ def _run_show(args: argparse.Namespace) -> int:
             # result) when nothing's live.
             pick = next((m for m, _ in ranked if m.phase.is_active_today),
                         ranked[0][0] if ranked else None)
-            print(oneline(pick) if pick else "🏏 no matches")
+            print(oneline(pick, prefs.gender_labels) if pick else "🏏 no matches")
             return
         if not args.no_enrich:
             # Fetch detailed scorecards for matches we'll show figures for (live /

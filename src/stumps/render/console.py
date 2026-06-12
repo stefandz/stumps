@@ -47,6 +47,52 @@ def _accent(match: Match, cls: Classification) -> str:
     return _TIER_ACCENT.get(cls.tier, "white")
 
 
+# -- gender labelling (display-only; the domain model / --json are untouched) --
+#
+# Blended scheme: the match *title* names paired national sides by gender —
+# men's internationals gain " Men" (women's titles already read "… Women" from
+# the feed), so a glance distinguishes the squads — while every mention *inside*
+# the panel drops the qualifier ("England 287/4", not "England Women 287/4"),
+# because the title has already set the context. All of this is render-time only.
+
+def _gender_suffix(name: str) -> str:
+    for suffix in (" Women", " Men"):
+        if name.endswith(suffix):
+            return suffix
+    return ""
+
+
+def _plain_name(name: str, labels: bool = True) -> str:
+    """A team name with its gender qualifier dropped — for prosaic mentions
+    inside a panel ("England Women" -> "England"). No-op when labels are off."""
+    if not labels:
+        return name
+    suffix = _gender_suffix(name)
+    return name[: -len(suffix)] if suffix else name
+
+
+def _plain_text(text: str, match: Match, labels: bool = True) -> str:
+    """Drop the gender qualifier from any of the match's team names where they
+    appear in free text (a synthesised headline, the feed's status prose)."""
+    if not labels or not text:
+        return text
+    # Longest names first, so "England Women" is handled before any "England".
+    for name in sorted(match.team_names, key=len, reverse=True):
+        base = _plain_name(name)
+        if base != name:
+            text = text.replace(name, base)
+    return text
+
+
+def _match_title(match: Match, labels: bool = True) -> str:
+    """The panel title. Men's internationals are labelled "X Men v Y Men" (both
+    sides are nations in that format); women's internationals already carry
+    "… Women" from the feed, and domestic titles are left as-is."""
+    if labels and match.format.is_international and not match.is_womens:
+        return " v ".join(f"{n} Men" for n in match.team_names)
+    return match.title
+
+
 #: Display sections, in order. Each match falls in exactly one (by phase); within
 #: a section they keep their relevance order. Headers give clear division.
 _SECTIONS = (
@@ -150,7 +196,7 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
-def _league_line(match: Match) -> Text | None:
+def _league_line(match: Match, labels: bool = True) -> Text | None:
     """Where the match's two teams currently sit in their league table — e.g.
     "Surrey 2nd (89 pts) · Hampshire 9th (53 pts)". None unless we have standings
     that include them (bilateral series and knockouts won't)."""
@@ -163,7 +209,7 @@ def _league_line(match: Match) -> Text | None:
                     if r.team.lower() in team.name.lower()
                     or team.name.lower() in r.team.lower()), None)
         if row:
-            parts.append(f"{team.name} {_ordinal(row.rank)} ({row.points} pts)")
+            parts.append(f"{_plain_name(team.name, labels)} {_ordinal(row.rank)} ({row.points} pts)")
     if not parts:
         return None
     txt = Text()
@@ -172,12 +218,12 @@ def _league_line(match: Match) -> Text | None:
     return txt
 
 
-def _scores_line(match: Match) -> Text:
+def _scores_line(match: Match, labels: bool = True) -> Text:
     txt = Text()
     for i, inns in enumerate(match.innings):
         if i:
             txt.append("   ")
-        txt.append(f"{inns.batting_team} ", style="bold")
+        txt.append(f"{_plain_name(inns.batting_team, labels)} ", style="bold")
         txt.append(inns.score)
         if inns.overs and not inns.all_out:
             txt.append(f" ({inns.overs:.1f} ov)", style="dim")
@@ -191,7 +237,7 @@ def _short_name(match: Match, team_name: str) -> str:
     return team_name.split()[0] if team_name else "?"
 
 
-def oneline(match: Match) -> str:
+def oneline(match: Match, labels: bool = True) -> str:
     """A single plain-text status line for the top match — for tmux / polybar /
     a menu bar. No panels, colour or markup; uses team abbreviations."""
     if match.innings:
@@ -200,7 +246,7 @@ def oneline(match: Match) -> str:
     else:
         scores = " v ".join(t.short_name for t in match.teams)
     out = f"🏏 {scores}"
-    headline = _headline(match)
+    headline = _headline(match, labels)
     if headline and headline.strip().lower() not in _GENERIC_STATUS:
         out += f" — {headline}"
     return out
@@ -319,9 +365,15 @@ def _final_innings_target(match: Match) -> tuple[str, int, int] | None:
     return batting, to_win, wickets_remaining
 
 
-def _headline(match: Match) -> str:
+def _headline(match: Match, labels: bool = True) -> str:
     """Best status line: a synthesised chase/lead phrase for active matches,
-    else the source's own status (result, schedule, rain note...)."""
+    else the source's own status (result, schedule, rain note...). Team mentions
+    are made prosaic (gender qualifier dropped) when `labels` is on — the panel
+    title already carries the distinction."""
+    return _plain_text(_headline_raw(match), match, labels)
+
+
+def _headline_raw(match: Match) -> str:
     if match.phase.is_active_today:
         chase = extract_chase_state(match)
         if chase and chase.runs_needed > 0 and chase.balls_remaining > 0:
@@ -463,26 +515,26 @@ def _winprob_bar(label: str, prob: float, accent: str, width: int = 24) -> Text:
     return bar
 
 
-def _winprob_block(est: WinEstimate, accent: str) -> Group:
+def _winprob_block(est: WinEstimate, accent: str, labels: bool = True) -> Group:
     rows: list = [Text("Win probability", style=f"bold {accent}")]
     ordered = sorted(est.probabilities.items(), key=lambda kv: kv[1], reverse=True)
     for label, prob in ordered:
-        rows.append(_winprob_bar(label, prob, accent))
+        rows.append(_winprob_bar(_plain_name(label, labels), prob, accent))
     return Group(*rows)
 
 
-def _compact_line(match: Match, cls: Classification) -> Text:
+def _compact_line(match: Match, cls: Classification, labels: bool = True) -> Text:
     """One-line-per-match summary for --compact."""
     accent = _accent(match, cls)
     label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
     line = Text()
     line.append(f"{label:<11}", style=style)
     line.append("  ")
-    line.append(match.title, style=f"bold {accent}")
+    line.append(_match_title(match, labels), style=f"bold {accent}")
     # Lead with the synthesised headline (the chase target / result) — it's the
     # most useful bit, and compact lines are clipped to one row, so the verbose
     # innings list trails where it can be truncated without losing the story.
-    headline = _headline(match)
+    headline = _headline(match, labels)
     if headline and headline.strip().lower() not in _GENERIC_STATUS:
         line.append(f"  — {headline}", style="dim")
     scores = "  ".join(
@@ -580,7 +632,7 @@ def _partnerships_block(inns, half: int = 12) -> Group | None:
     return Group(*rows)
 
 
-def _standings_panel(standings: Standings, accent: str) -> Panel:
+def _standings_panel(standings: Standings, accent: str, labels: bool = True) -> Panel:
     rows = standings.rows
     # Multi-day tables have draws; limited-overs tables have a net run rate (and
     # sometimes qualification flags). Show only the columns that apply.
@@ -601,7 +653,7 @@ def _standings_panel(standings: Standings, accent: str) -> Panel:
         t.add_column("NRR", justify="right")
 
     for row in rows:
-        team = Text(row.team)
+        team = Text(_plain_name(row.team, labels))
         if show_q and row.qualified:
             team.append("  Q", style="bold green")
         cells = [str(row.rank), team, str(row.played), str(row.won), str(row.lost)]
@@ -624,16 +676,17 @@ def _labelled(label: str, value: str) -> Text:
     return line
 
 
-def _headline_line(match: Match) -> Text | None:
+def _headline_line(match: Match, labels: bool = True) -> Text | None:
     """The synthesised/source headline, unless it's a bare state word the badge
     already conveys."""
-    headline = _headline(match)
+    headline = _headline(match, labels)
     if headline and headline.strip().lower() not in _GENERIC_STATUS:
         return Text(headline, style="bold")
     return None
 
 
-def _wrap_panel(match: Match, cls: Classification, body: list) -> Panel:
+def _wrap_panel(match: Match, cls: Classification, body: list,
+                labels: bool = True) -> Panel:
     """Frame a body in the standard match panel (badge + title, subtitle, tier
     border). An empty body becomes a muted placeholder rather than an empty
     frame (e.g. a match listed before any scorecard exists)."""
@@ -646,7 +699,7 @@ def _wrap_panel(match: Match, cls: Classification, body: list) -> Panel:
     title = Text()
     title.append(_phase_badge(match))
     title.append("  ")
-    title.append(match.title, style=f"bold {accent}")
+    title.append(_match_title(match, labels), style=f"bold {accent}")
     return Panel(Group(*body), title=title, title_align="left",
                  subtitle=_subtitle(match), subtitle_align="left",
                  border_style=accent, padding=(0, 1))
@@ -656,21 +709,22 @@ def _match_panel(
     match: Match, cls: Classification, settings, prefs: Preferences
 ) -> Panel:
     accent = _accent(match, cls)
+    labels = prefs.gender_labels
     body: list = []
-    hl = _headline_line(match)
+    hl = _headline_line(match, labels)
     if hl is not None:
         body.append(hl)
     if match.phase is Phase.UPCOMING and match.starts_at:
         when = _local_start(match.starts_at)
         if when:
             body.append(_labelled("Starts", when))
-    scores = _scores_line(match)
+    scores = _scores_line(match, labels)
     if scores.plain.strip():
         body.append(scores)
     if match.phase is Phase.COMPLETE and match.points:
         body.append(_labelled("Points", match.points))
     if prefs.show_table:
-        league = _league_line(match)
+        league = _league_line(match, labels)
         if league is not None:
             body.append(league)
 
@@ -701,9 +755,9 @@ def _match_panel(
             est = estimate(match, settings,
                            use_multiday_model=prefs.use_multiday_model)
             if est is not None:
-                body.append(_winprob_block(est, accent))
+                body.append(_winprob_block(est, accent, labels))
 
-    return _wrap_panel(match, cls, body)
+    return _wrap_panel(match, cls, body, labels)
 
 
 def render_match_detail(
@@ -714,15 +768,16 @@ def render_match_detail(
     innings (every batter with how-out + every bowler), plus the usual headline,
     points, DLS, win probability and recent balls."""
     accent = _accent(match, cls)
+    labels = prefs.gender_labels
     body: list = []
 
-    hl = _headline_line(match)
+    hl = _headline_line(match, labels)
     if hl is not None:
         body.append(hl)
     if match.phase is Phase.COMPLETE and match.points:
         body.append(_labelled("Points", match.points))
     if prefs.show_table:
-        league = _league_line(match)
+        league = _league_line(match, labels)
         if league is not None:
             body.append(league)
     if match.toss:
@@ -731,7 +786,8 @@ def render_match_detail(
     for inns in match.innings:
         body.append(Text(""))  # spacer between innings
         head = Text(f"{_ordinal(inns.number)} innings — "
-                    f"{inns.batting_team} {inns.score}", style=f"bold {accent}")
+                    f"{_plain_name(inns.batting_team, labels)} {inns.score}",
+                    style=f"bold {accent}")
         if inns.overs and not inns.all_out:
             head.append(f"  ({inns.overs:.1f} ov)", style="dim")
         body.append(head)
@@ -765,7 +821,7 @@ def render_match_detail(
             est = estimate(match, settings,
                            use_multiday_model=prefs.use_multiday_model)
             if est is not None:
-                body.append(_winprob_block(est, accent))
+                body.append(_winprob_block(est, accent, labels))
     if prefs.show_commentary:
         recent = _recent_balls_block(match, prefs.balls)
         if recent is not None:
@@ -774,7 +830,7 @@ def render_match_detail(
     if match.officials:
         body.append(_labelled("Umpires", " · ".join(match.officials)))
 
-    console.print(_wrap_panel(match, cls, body))
+    console.print(_wrap_panel(match, cls, body, labels))
 
 
 def render_report(
@@ -818,8 +874,8 @@ def render_report(
         console.rule(Text(title, style="bold"), align="left", style="dim")
         for match, cls in section:
             if prefs.compact:
-                console.print(_compact_line(match, cls), no_wrap=True,
-                              overflow="ellipsis")
+                console.print(_compact_line(match, cls, prefs.gender_labels),
+                              no_wrap=True, overflow="ellipsis")
             else:
                 console.print(_match_panel(match, cls, settings, prefs))
 
@@ -829,4 +885,5 @@ def render_report(
             table = match.standings
             if table and table.rows and table.name not in seen:
                 seen.add(table.name)
-                console.print(_standings_panel(table, _accent(match, cls)))
+                console.print(_standings_panel(table, _accent(match, cls),
+                                               prefs.gender_labels))

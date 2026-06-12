@@ -602,3 +602,57 @@ def test_json_output_schema():
     assert m["dls"]["par"] > 0
     assert m["innings"][1]["batters"][0]["name"] == "V Kohli"
     assert m["recent_balls"][0]["over"] == "38.0"
+
+
+# -- gender labelling (blended: gendered title, prosaic inside) -------------
+
+
+def _intl(fmt, names, batting):
+    from stumps.models import Innings, Match, Team
+    return Match("g", fmt, [Team(n) for n in names], phase=Phase.LIVE,
+                 status_text=f"{batting} need 50 runs",
+                 innings=[Innings(batting_team=batting, runs=120, wickets=3)])
+
+
+def test_gender_label_helpers():
+    from stumps.render.console import _match_title, _plain_name, _plain_text
+    mens = _intl(Format.ODI, ["England", "India"], "England")
+    womens = _intl(Format.WT20I, ["England Women", "India Women"], "England Women")
+    # Men's international title gains " Men"; women's already reads "… Women".
+    assert _match_title(mens) == "England Men v India Men"
+    assert _match_title(womens) == "England Women v India Women"
+    # Inside the box, the qualifier is dropped.
+    assert _plain_name("England Women") == "England"
+    assert _plain_name("England") == "England"
+    assert _plain_text("England Women need 50", womens) == "England need 50"
+    # Off -> everything stays exactly as the feed gave it.
+    assert _match_title(mens, labels=False) == "England v India"
+    assert _plain_name("England Women", labels=False) == "England Women"
+
+
+def test_mens_international_title_gendered_inside_prosaic():
+    out = _render(_intl(Format.ODI, ["England", "India"], "England"), _settings())
+    assert "England Men v India Men" in out  # title carries the gender
+    assert "England need 50 runs" in out     # inside stays prosaic (men's: bare)
+
+
+def test_womens_match_title_kept_inside_stripped():
+    out = _render(_intl(Format.WT20I, ["England Women", "India Women"],
+                        "England Women"), _settings())
+    assert "England Women v India Women" in out   # title
+    assert "England need 50 runs" in out          # headline stripped of "Women"
+    assert "England Women need" not in out         # not the gendered form inside
+
+
+def test_domestic_mens_title_not_gendered():
+    # A county (non-international) men's game must never become "Surrey Men".
+    out = _render(_intl(Format.T20, ["Surrey", "Kent"], "Surrey"), _settings())
+    assert "Surrey v Kent" in out
+    assert "Surrey Men" not in out
+
+
+def test_no_gender_labels_opt_out():
+    prefs = Preferences(); prefs.gender_labels = False
+    out = _render(_intl(Format.ODI, ["England", "India"], "England"),
+                  _settings(), prefs)
+    assert "England v India" in out and "England Men" not in out

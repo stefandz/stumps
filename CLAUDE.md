@@ -216,7 +216,16 @@ sources/* ── Match objects ──> prioritise ──> render
   becomes "require N runs to win with W wickets remaining"
   (`_final_innings_target`), otherwise the lead/trail line; everything else falls
   back to the source's own `status_text` (or a `_synth_result` fallback for
-  finished games). `--compact` is one clipped line per match, leading with that
+  finished games). **Gender labelling is blended and display-only** (default on,
+  `--no-gender-labels` / `Preferences.gender_labels`): the panel *title* names
+  paired national sides by gender — `_match_title` appends " Men" to a men's
+  international (both sides are nations in that format; women's titles already
+  read "… Women" from the feed) — while every mention *inside* the panel is made
+  prosaic (`_plain_name` on a team name, `_plain_text` over synthesised/feed
+  prose: "England 287/4", not "England Women 287/4"), since the title has set the
+  context. The domain model and `--json` are untouched (so matching/JSON stay
+  stable); the `labels` bool threads from `prefs.gender_labels` through the panel
+  builders. `--compact` is one clipped line per match, leading with that
   headline. The report is grouped into phase **sections** (`_SECTIONS`: ● Live →
   ✓ Results → ◌ Upcoming) with a header rule each; within a section, matches keep
   their relevance order (tier, then format, then time). The panel/border accent

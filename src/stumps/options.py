@@ -67,6 +67,11 @@ class Preferences:
     show_commentary: bool = True
     show_standings: bool = False  # append full league tables (--standings)
     show_table: bool = True  # inline league positions of the two teams (--no-table)
+    #: Label paired national sides by gender in the *match title* ("England Men v
+    #: New Zealand Men"; women's titles already read "… Women" from the feed),
+    #: while mentions *inside* the panel stay prosaic ("England") — the title has
+    #: set the context. On by default; --no-gender-labels turns it off.
+    gender_labels: bool = True
     balls: int = 6
     #: Use the trained multi-day Test/first-class model instead of the heuristic.
     use_multiday_model: bool = False
@@ -102,6 +107,8 @@ class Preferences:
         prefs.notify = bool(config.get("notify", prefs.notify))
         prefs.show_standings = bool(config.get("standings", prefs.show_standings))
         prefs.core_results_only = bool(config.get("core_results", prefs.core_results_only))
+        if "gender_labels" in config:
+            prefs.gender_labels = bool(config["gender_labels"])
 
         # CLI overrides
         if getattr(args, "team", None):
@@ -144,6 +151,8 @@ class Preferences:
         prefs.show_commentary = not getattr(args, "no_commentary", False)
         prefs.show_standings = prefs.show_standings or getattr(args, "standings", False)
         prefs.show_table = not getattr(args, "no_table", False)
+        if getattr(args, "no_gender_labels", False):
+            prefs.gender_labels = False
         if getattr(args, "balls", None) is not None:
             prefs.balls = args.balls
         if getattr(args, "no_results", False):
