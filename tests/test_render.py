@@ -257,6 +257,34 @@ def test_partnerships_fall_back_to_plain_list_without_split():
     assert "█" not in out  # no diverging bar when the per-batter split is absent
 
 
+def test_match_detail_shows_bonus_points():
+    # County Championship live: Glamorgan 107/6, so Sussex have 2 bowling points
+    # (6 wkts) and Glamorgan 0 batting — computed, since the feed gives nothing.
+    from stumps.models import Innings, Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("bp", Format.FIRST_CLASS, [Team("Sussex"), Team("Glamorgan")],
+              phase=Phase.LIVE, series_name="Rothesay County Championship",
+              status_text="Glamorgan trail",
+              innings=[Innings("Glamorgan", "Sussex", 1, 107, 6, 36.0)])
+    c = Console(width=90, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    out = c.export_text()
+    assert "Bonus points" in out and "first 110 overs" in out and "not official" in out
+    # Sussex bowling 2; Glamorgan yet to bowl shows a dash.
+    assert "Bat" in out and "Bowl" in out
+
+
+def test_no_bonus_block_for_non_bonus_competition():
+    from stumps.models import Innings, Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("nb", Format.FIRST_CLASS, [Team("A"), Team("B")],
+              phase=Phase.LIVE, series_name="Some Friendly Series",
+              innings=[Innings("A", "B", 1, 300, 5, 80.0)])
+    c = Console(width=90, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    assert "Bonus points" not in c.export_text()
+
+
 def test_captain_marked_in_batting_card():
     from stumps.models import Batter, Innings, Match, Team
     from stumps.render.console import render_match_detail

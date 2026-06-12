@@ -464,6 +464,43 @@ class EspnSource(DataSource):
         return out
 
     @staticmethod
+    def _infer_partnership_batters(inns: Innings) -> None:
+        """ESPN's `partnerships` block carries the stand's runs/overs but often
+        leaves `batsmen` as empty `athlete: {}` objects (no names, no split).
+        We can't recover the per-batter contribution, but we *can* recover who
+        was batting: the openers start the innings, and at each wicket the
+        batter named in the fall-of-wickets is replaced by the next one in the
+        batting order. Fills `batter1`/`batter2` in place; leaves `runs1`/`runs2`
+        at 0 so the renderer still uses the no-bar fallback.
+
+        Best-effort: skipped if the feed already named the batters, and bails out
+        (leaving later stands blank rather than guessing) if a FoW name doesn't
+        match anyone at the crease — e.g. a retirement breaks the simple chain."""
+        ps = inns.partnerships
+        if not ps or any(p.batter1 or p.batter2 for p in ps):
+            return
+        order = [b.name for b in inns.batters if b.name]
+        if len(order) < 2:
+            return
+        out_at = {w.wicket: w.batter for w in inns.fall_of_wickets}
+        crease = [order[0], order[1]]
+        next_in = 2
+        # Partnerships arrive in wicket order (1st, 2nd, …); the last one in a
+        # live innings is the current unbroken stand (no matching fall).
+        for wkt, p in enumerate(ps, start=1):
+            p.batter1, p.batter2 = crease[0], crease[1]
+            out_name = out_at.get(wkt)
+            if not out_name:
+                break  # current partnership — nothing fell to end it
+            if out_name not in crease:
+                # Chain broke (retirement, name mismatch); don't guess the rest.
+                for later in ps[wkt:]:
+                    later.batter1 = later.batter2 = ""
+                break
+            crease[crease.index(out_name)] = order[next_in] if next_in < len(order) else ""
+            next_in += 1
+
+    @staticmethod
     def _over_scores(ls: dict) -> list[OverScore]:
         """Runs/wickets per over, from the linescore `statistics.overs` block
         (a list of {number, runs, wicket[...]}), in over order."""
@@ -623,6 +660,7 @@ class EspnSource(DataSource):
                 fall_of_wickets=self._fall_of_wickets(ls),
                 over_scores=self._over_scores(ls),
             )
+            self._infer_partnership_batters(inns)
             innings.append(inns)
         return innings
 

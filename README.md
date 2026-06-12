@@ -310,6 +310,16 @@ to land within ~1–2 runs of the official par for normal totals, diverging a
 little more for very high first-innings scores (300+). Always labelled
 "indicative".
 
+## Bonus points
+
+In a first-class match the `--match` detail shows the **batting & bowling bonus
+points each side has earned so far**. No feed exposes these live (they only
+appear once a game is finished), so they're **computed** from the competition's
+own scheme — currently the County Championship, Sheffield Shield and Plunket
+Shield — and labelled "computed, not official". Only first innings count, within
+each competition's over window; once an innings runs past that window without
+over-by-over data the figure can overstate, so it's flagged with a `~`.
+
 ## Tests
 
 ```bash

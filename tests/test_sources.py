@@ -333,6 +333,63 @@ def test_espn_partnerships_from_linescore(settings):
     assert src._partnerships({}) == []
 
 
+def _innings_for_partnership_inference():
+    from stumps.models import Batter, FallOfWicket, Innings, Partnership
+    # Batting order != dismissal order: Ingram bats #5 but falls before #4
+    # Kellaway. Reconstruction must follow the FoW names, not the order.
+    order = ["Zain", "Tribe", "Carlson", "Kellaway", "Ingram", "Dickson", "Cooke"]
+    return Innings(
+        "Glamorgan", "Sussex", 1, 96, 5, 31.2,
+        batters=[Batter(name=n) for n in order],
+        fall_of_wickets=[
+            FallOfWicket(1, 5, "1.1", "Zain"),
+            FallOfWicket(2, 11, "4.6", "Tribe"),
+            FallOfWicket(3, 42, "12.5", "Carlson"),
+            FallOfWicket(4, 43, "13.4", "Ingram"),
+            FallOfWicket(5, 94, "29.3", "Kellaway"),
+        ],
+        # Feed gave the stands but left the batters blank (empty athlete objects).
+        partnerships=[Partnership(w, r, o) for w, r, o in [
+            ("1st", 5, "1.1"), ("2nd", 6, "3.5"), ("3rd", 31, "7.5"),
+            ("4th", 1, "0.5"), ("5th", 51, "15.5"), ("6th", 11, "3.1")]],
+    )
+
+
+def test_espn_infers_partnership_batters_from_fow():
+    inns = _innings_for_partnership_inference()
+    EspnSource._infer_partnership_batters(inns)
+    pairs = [(p.batter1, p.batter2) for p in inns.partnerships]
+    assert pairs == [
+        ("Zain", "Tribe"),
+        ("Carlson", "Tribe"),
+        ("Carlson", "Kellaway"),
+        ("Ingram", "Kellaway"),
+        ("Dickson", "Kellaway"),
+        ("Dickson", "Cooke"),  # current unbroken stand: the two not-out batters
+    ]
+    # Per-batter runs are genuinely unknown, so they stay 0 (no misleading bar).
+    assert all(p.runs1 == 0 and p.runs2 == 0 for p in inns.partnerships)
+
+
+def test_espn_partnership_inference_respects_feed_names():
+    # If the feed already named the batters, don't second-guess it.
+    inns = _innings_for_partnership_inference()
+    inns.partnerships[0].batter1 = "Someone"
+    EspnSource._infer_partnership_batters(inns)
+    assert inns.partnerships[0].batter1 == "Someone"
+    assert inns.partnerships[1].batter1 == ""  # untouched
+
+
+def test_espn_partnership_inference_bails_on_broken_chain():
+    # A FoW name that matches nobody at the crease (e.g. a retirement) stops the
+    # chain: stands up to that point are kept, the rest left blank, never guessed.
+    inns = _innings_for_partnership_inference()
+    inns.fall_of_wickets[2].batter = "Ghost"  # 3rd wicket: unknown name
+    EspnSource._infer_partnership_batters(inns)
+    assert (inns.partnerships[2].batter1, inns.partnerships[2].batter2) == ("Carlson", "Kellaway")
+    assert (inns.partnerships[3].batter1, inns.partnerships[3].batter2) == ("", "")
+
+
 def test_espn_over_scores_from_linescore(settings):
     src = EspnSource(settings)
     ov = src._over_scores({"statistics": {"overs": [[

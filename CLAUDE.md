@@ -160,6 +160,26 @@ sources/* ── Match objects ──> prioritise ──> render
   no longer tags par scores "indicative" (kept clean by preference), but they are
   still an approximation; the README's DLS section says so.
 
+- **`bonus.py`** — first-class **batting/bowling bonus points earned so far**, the
+  figure no feed gives live (ESPN emits a `points` note only post-match; standings
+  are season totals), so it's *computed* from each competition's published scheme
+  and labelled "computed, not official" — like DLS, an approximation. Rules are
+  competition-specific, so `rule_for(series_name)` matches the series name against
+  a small registry (`_RULES`): England County Championship (110-over window,
+  batting 250/300/350/400/450 → 1–5, bowling 3/6/9 wkts → 1–3), Sheffield Shield
+  (100-over, batting 0.01/run above 200 uncapped, bowling 5/7/9 → 0.5/1/1.5),
+  Plunket Shield (110-over, batting 200/250/300/350 → 1–4, bowling 3/5/7/9 → 1–4);
+  add more as their rules are verified. Only the **first innings of each side**
+  count (`match_bonus` skips innings 3/4); a team earns batting bonus from its own
+  first innings, bowling bonus from the opponent's. The over window is the data
+  weak spot: while an innings is inside the cap the live score *is* the window
+  figure (exact), and `_window_figures` sums the over-by-over block to the cap
+  when present (exact at any stage) — but once an innings runs past the cap with
+  no over data, it falls back to the current score and sets `approx` (an
+  over-stating upper bound, rendered with a `~` and a caption). `render.console`
+  `_bonus_block` shows it in the `--match` detail only (a Bat/Bowl/Total mini-
+  table; a dash = that side's relevant innings hasn't happened yet).
+
 - **`winprob/`** — the home-grown win estimate (**not** WinViz; it's proprietary
   with no API — and its endpoints carry no probability field anyway). Two feature
   contracts, each a *single source of truth* shared by training and inference so
@@ -242,7 +262,12 @@ sources/* ── Match objects ──> prioritise ──> render
   a fall-of-wickets line (every innings, from the linescore `fow` — populated
   even for county games), partnerships (every innings, from the linescore
   `partnerships`, as a back-to-back bar of each batter's runs on a shared centre
-  line — falling back to a plain list when the per-batter split is absent), an
+  line — falling back to a plain list when the per-batter split is absent; the
+  feed frequently leaves the `batsmen` athletes empty, so
+  `EspnSource._infer_partnership_batters` reconstructs *who* batted in each stand
+  from the batting order + fall-of-wickets, openers-first, replacing the FoW-named
+  batter at each wicket — names only, never a fabricated per-batter split, and it
+  bails rather than guesses when a FoW name doesn't match the crease), an
   over-by-over sparkline (`_over_sparkline`, from the linescore
   `statistics.overs`; also shown for the live current innings), the toss and the
   umpires. Captains are marked `(c)` (`Batter.captain`); the wicketkeeper isn't

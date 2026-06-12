@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from stumps import dls
+from stumps import bonus, dls
 from stumps.dls.par import G50_ASSOCIATE_OR_WOMENS_ODI, G50_FULL_MEMBER
 from stumps.models import Format, Match, Phase, Standings
 from stumps.options import Preferences
@@ -632,6 +632,49 @@ def _partnerships_block(inns, half: int = 12) -> Group | None:
     return Group(*rows)
 
 
+def _fmt_points(value: float) -> str:
+    """Whole points lose the ".0" (County/Plunket); halves stay (Shield 1.5)."""
+    return f"{value:g}"
+
+
+def _bonus_block(match: Match, labels: bool = True) -> Group | None:
+    """First-innings batting/bowling bonus points earned so far, per team — the
+    figure no feed gives live, so it's computed from the competition's rules and
+    labelled as such. None when the competition has no scheme we know."""
+    rows = bonus.match_bonus(match)
+    if rows is None:
+        return None
+    rule = bonus.rule_for(match.series_name)
+    approx = any(r.approx for r in rows)
+
+    def cell(value: float, seen: bool, mark: bool) -> str:
+        if not seen:
+            return "–"  # that innings hasn't happened yet
+        return f"{_fmt_points(value)}{'~' if mark and value else ''}"
+
+    t = Table(box=None, show_header=True, header_style="bold dim",
+              padding=(0, 2), pad_edge=False)
+    t.add_column("Team")
+    for col in ("Bat", "Bowl", "Total"):
+        t.add_column(col, justify="right")
+    for r in rows:
+        t.add_row(
+            _plain_name(r.team, labels),
+            cell(r.batting, r.batting_seen, r.approx),
+            cell(r.bowling, r.bowling_seen, r.approx),
+            Text(_fmt_points(r.total), style="bold"),
+        )
+
+    window = rule.window if rule else "first innings"
+    caption = f"Bonus points · {window} · computed, not official"
+    head = Text(caption, style="bold dim")
+    out: list = [head, t]
+    if approx:
+        out.append(Text("~ past the over limit — from current score, may overstate",
+                        style="dim italic"))
+    return Group(*out)
+
+
 def _standings_panel(standings: Standings, accent: str, labels: bool = True) -> Panel:
     rows = standings.rows
     # Multi-day tables have draws; limited-overs tables have a net run rate (and
@@ -782,6 +825,10 @@ def render_match_detail(
             body.append(league)
     if match.toss:
         body.append(_labelled("Toss", match.toss))
+    bonus_block = _bonus_block(match, labels)
+    if bonus_block is not None:
+        body.append(Text(""))
+        body.append(bonus_block)
 
     for inns in match.innings:
         body.append(Text(""))  # spacer between innings
