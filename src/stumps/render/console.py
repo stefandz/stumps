@@ -17,7 +17,7 @@ from rich.text import Text
 
 from stumps import bonus, dls
 from stumps.dls.par import G50_ASSOCIATE_OR_WOMENS_ODI, G50_FULL_MEMBER
-from stumps.models import Format, Match, Phase, Standings
+from stumps.models import Format, Innings, Match, Phase, Standings
 from stumps.options import Preferences
 from stumps.prioritise import Classification, Tier
 from stumps.sources.aggregator import FetchResult
@@ -412,20 +412,81 @@ def _headline_raw(match: Match) -> str:
     return match.status_text
 
 
+def _multiday_margin(match: Match) -> str:
+    """Reconstruct a finished multi-day result line *with margin* from the
+    `winner` flag and the innings aggregates. The three forms are determined by
+    who batted last and how many innings each side played:
+
+    - winner batted last and passed the target -> "won by N wickets"
+      (N = 10 - wickets lost in that innings);
+    - winner bowled last; the side batting last fell short -> "won by N runs"
+      (N = winner's aggregate - loser's aggregate);
+    - winner batted once, loser twice -> "won by an innings and N runs".
+
+    Falls back to a bare "{winner} won" whenever the innings data is too thin or
+    inconsistent to compute a margin safely (collapsed scoreboard, < 3 innings,
+    a non-positive winning aggregate, an implausible wicket count). The feed's
+    own "won by ..." text is preferred over this whenever it's present — this is
+    only reached when the feed gave us a bare label."""
+    winner = match.winner
+    bare = f"{winner} won"
+    inns = match.innings
+    if len(inns) < 3:  # a real multi-day result needs >= 3 innings
+        return bare
+
+    def belongs(innings: Innings, team: str) -> bool:
+        return _names_match(innings.batting_team, team)
+
+    others = [n for n in match.team_names if not _names_match(n, winner)]
+    if len(others) != 1:
+        return bare
+    loser = others[0]
+
+    win_inns = [i for i in inns if belongs(i, winner)]
+    lose_inns = [i for i in inns if belongs(i, loser)]
+    if not win_inns or not lose_inns:
+        return bare
+    win_total = sum(i.runs for i in win_inns)
+    lose_total = sum(i.runs for i in lose_inns)
+    if win_total <= lose_total:  # winner must out-aggregate the loser
+        return bare
+
+    last = max(inns, key=lambda i: i.number)
+    if belongs(last, winner):  # winner chased and won
+        wkts = 10 - last.wickets
+        if not 1 <= wkts <= 10:
+            return bare
+        unit = "wicket" if wkts == 1 else "wickets"
+        return f"{winner} won by {wkts} {unit}"
+
+    margin = win_total - lose_total
+    if len(win_inns) == 1 and len(lose_inns) >= 2:  # innings victory
+        runs = "run" if margin == 1 else "runs"
+        return f"{winner} won by an innings and {margin} {runs}"
+    runs = "run" if margin == 1 else "runs"
+    return f"{winner} won by {margin} {runs}"
+
+
+def _names_match(a: str, b: str) -> bool:
+    a, b = a.lower(), b.lower()
+    return bool(a) and (a in b or b in a)
+
+
 def _synth_result(match: Match) -> str | None:
     """Best-effort result line for a finished match when the feed gave us no
     usable text (just "Result"/"Final").
 
     Multi-day games lean on the feed's authoritative `winner` flag (a finished
-    game with no winner is a draw); deriving the margin from scores is left off,
-    since the full innings list carries it. Limited-overs games are derived from
+    game with no winner is a draw) and reconstruct the margin from the innings
+    aggregates (`_multiday_margin`), falling back to a bare "X won" when the
+    innings data is too thin to be sure. Limited-overs games are derived from
     the chase: with a target we give the full margin ("won by N runs/wickets");
     D/L-affected ones are skipped (the visible totals would mislead)."""
     if match.format.is_multi_day:
         if not match.innings:
             return None
         if match.winner:
-            return f"{match.winner} won"
+            return _multiday_margin(match)
         return "Match drawn"
     if not match.format.is_limited_overs or len(match.innings) < 2:
         return None

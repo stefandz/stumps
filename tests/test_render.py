@@ -124,18 +124,20 @@ def test_synth_result_skips_dls():
     assert _synth_result(m2) is None
 
 
-def _completed_test(winner="", status="Result"):
+def _completed_test(winner="", status="Result", innings=None):
     from stumps.models import Innings, Match, Team
+    # Default: England 400 & 250d (650), Australia 300 & 200 a.o. (500) chasing
+    # 351 -> England, bowling last, won by 150 runs.
+    innings = innings if innings is not None else [
+        Innings("England", "Australia", 1, 400, 10, 120.0, all_out=True, closed=True),
+        Innings("Australia", "England", 2, 300, 10, 100.0, all_out=True, closed=True),
+        Innings("England", "Australia", 3, 250, 8, 70.0, declared=True, closed=True),
+        Innings("Australia", "England", 4, 200, 10, 60.0, all_out=True, target=351, closed=True),
+    ]
     return Match(
         match_id="td", format=Format.TEST, phase=Phase.COMPLETE,
         teams=[Team("England", "ENG"), Team("Australia", "AUS")],
-        status_text=status, winner=winner,
-        innings=[
-            Innings("England", "Australia", 1, 400, 10, 120.0, all_out=True, closed=True),
-            Innings("Australia", "England", 2, 300, 10, 100.0, all_out=True, closed=True),
-            Innings("England", "Australia", 3, 250, 8, 70.0, declared=True, closed=True),
-            Innings("Australia", "England", 4, 200, 5, 60.0, target=351, closed=True),
-        ],
+        status_text=status, winner=winner, innings=innings,
     )
 
 
@@ -144,8 +146,66 @@ def test_synth_result_multiday_draw():
     assert _synth_result(_completed_test(winner="")) == "Match drawn"
 
 
-def test_synth_result_multiday_win_from_winner_flag():
-    assert _synth_result(_completed_test(winner="England")) == "England won"
+def test_synth_result_multiday_won_by_runs():
+    # Winner bowled last; loser fell 150 short on aggregate (650 v 500).
+    assert _synth_result(_completed_test(winner="England")) == "England won by 150 runs"
+
+
+def test_synth_result_multiday_won_by_wickets():
+    # England chase 151 in the 4th innings, reaching it 3 down -> by 7 wickets.
+    from stumps.models import Innings
+    inns = [
+        Innings("Australia", "England", 1, 250, 10, 90.0, all_out=True, closed=True),
+        Innings("England", "Australia", 2, 300, 10, 100.0, all_out=True, closed=True),
+        Innings("Australia", "England", 3, 200, 10, 70.0, all_out=True, closed=True),
+        Innings("England", "Australia", 4, 151, 3, 40.0, target=151, closed=True),
+    ]
+    assert _synth_result(_completed_test(winner="England", innings=inns)) \
+        == "England won by 7 wickets"
+
+
+def test_synth_result_multiday_won_by_innings():
+    # England bat once (450); Australia twice (150 + 120 = 270) and never catch
+    # up -> won by an innings and 180 runs.
+    from stumps.models import Innings
+    inns = [
+        Innings("Australia", "England", 1, 150, 10, 50.0, all_out=True, closed=True),
+        Innings("England", "Australia", 2, 450, 10, 130.0, all_out=True, closed=True),
+        Innings("Australia", "England", 3, 120, 10, 45.0, all_out=True, closed=True),
+    ]
+    assert _synth_result(_completed_test(winner="England", innings=inns)) \
+        == "England won by an innings and 180 runs"
+
+
+def test_synth_result_multiday_singular_units():
+    from stumps.models import Innings
+    by_one_wkt = [
+        Innings("Australia", "England", 1, 250, 10, 90.0, all_out=True, closed=True),
+        Innings("England", "Australia", 2, 300, 10, 100.0, all_out=True, closed=True),
+        Innings("Australia", "England", 3, 200, 10, 70.0, all_out=True, closed=True),
+        Innings("England", "Australia", 4, 151, 9, 49.0, target=151, closed=True),
+    ]
+    assert _synth_result(_completed_test(winner="England", innings=by_one_wkt)) \
+        == "England won by 1 wicket"
+    by_one_run = [
+        Innings("England", "Australia", 1, 400, 10, 120.0, all_out=True, closed=True),
+        Innings("Australia", "England", 2, 300, 10, 100.0, all_out=True, closed=True),
+        Innings("England", "Australia", 3, 200, 10, 70.0, all_out=True, closed=True),
+        Innings("Australia", "England", 4, 299, 10, 95.0, all_out=True, target=301, closed=True),
+    ]
+    assert _synth_result(_completed_test(winner="England", innings=by_one_run)) \
+        == "England won by 1 run"
+
+
+def test_synth_result_multiday_thin_data_falls_back():
+    # Collapsed scoreboard (one innings per side) -> can't compute a margin, so
+    # we name the winner without one.
+    from stumps.models import Innings
+    inns = [
+        Innings("England", "Australia", 1, 650, 10, 190.0, all_out=True, closed=True),
+        Innings("Australia", "England", 2, 500, 10, 160.0, all_out=True, closed=True),
+    ]
+    assert _synth_result(_completed_test(winner="England", innings=inns)) == "England won"
 
 
 def test_accent_is_tier_colour_not_phase():

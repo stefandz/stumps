@@ -121,8 +121,12 @@ sources/* ── Match objects ──> prioritise ──> render
     scoreboard score string collapses to one innings per side ("421 & 259/5d"),
     so only the per-event summary's `linescores` recover the full innings list.
     When the feed leaves no usable result text, `render.console._synth_result`
-    reconstructs one — multi-day from `Match.winner` ("X won", else "Match
-    drawn"; the full innings list carries the margin), limited-overs from the
+    reconstructs one — multi-day via `_multiday_margin` (from `Match.winner` +
+    the innings aggregates: "won by N wickets" if the winner batted last, "won
+    by N runs" if it bowled last, "won by an innings and N runs" if it batted
+    once; bare "X won" only when the innings data is too thin/inconsistent —
+    < 3 innings, collapsed scoreboard — and "Match drawn" with no winner),
+    limited-overs from the
     chase ("won by N runs/wickets", skipping D/L where the totals would mislead).
 
 - **`options.py`** holds `Preferences` — the user-facing choices (followed
