@@ -182,8 +182,10 @@ sources/* ── Match objects ──> prioritise ──> render
   - **The dominant input for multi-day is overs remaining**, which no feed gives
     directly. `multiday.overs_remaining_estimate` reconstructs it from the
     scheduled close + present local time (parsed by `espn._apply_multiday_timing`
-    from the summary `notes`: `hoursofplay` close, `matchdays` total days,
-    `closeofplay` count → current day) at ~3.75 min/over (96/day for first-class,
+    from the summary `notes`: `hoursofplay` close, `matchdays` total days *and*
+    its explicit date list → current day by matching today against it, accurate
+    from day 1; `closeofplay` count is the fallback when the dates don't parse)
+    at ~3.75 min/over (96/day for first-class,
     90 for Tests), falling back to a mid-day prior. The B model trains on a
     days-based proxy for the same quantity. Both are labelled "rough"/an estimate.
 

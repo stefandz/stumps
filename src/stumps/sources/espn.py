@@ -531,9 +531,10 @@ class EspnSource(DataSource):
         # can't be parsed.
         day_number = None
         if dates:
-            if date.today() in dates:
-                day_number = dates.index(date.today()) + 1
-            elif date.today() < dates[0]:
+            today = date.today()
+            if today in dates:
+                day_number = dates.index(today) + 1
+            elif today < dates[0]:
                 day_number = 1
             else:
                 day_number = len(dates)
