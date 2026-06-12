@@ -1,5 +1,7 @@
 """Source normalisers and aggregator fallback (no network)."""
 
+from datetime import date
+
 import pytest
 
 from stumps.config import Settings
@@ -404,7 +406,32 @@ def test_espn_standings_from_summary(settings):
     assert m2.standings is None
 
 
-def test_espn_multiday_timing_from_notes(settings):
+def _freeze_today(monkeypatch, today):
+    """Pin date.today() inside espn.py so day-number logic is deterministic."""
+    from datetime import date as _date
+
+    class _FrozenDate(_date):
+        @classmethod
+        def today(cls):
+            return today
+    monkeypatch.setattr("stumps.sources.espn.date", _FrozenDate)
+
+
+def test_espn_parse_match_dates():
+    from datetime import date
+
+    from stumps.sources.espn import _parse_match_dates
+    assert _parse_match_dates("12,13,14,15 June 2026 (4-day match)") == [
+        date(2026, 6, d) for d in (12, 13, 14, 15)
+    ]
+    # Cross-month span: a run of days is closed by the month that follows it.
+    assert _parse_match_dates("31 May, 1,2,3 June 2026 (4-day match)") == [
+        date(2026, 5, 31), date(2026, 6, 1), date(2026, 6, 2), date(2026, 6, 3),
+    ]
+    assert _parse_match_dates("no dates here") == []
+
+
+def test_espn_multiday_timing_from_notes(settings, monkeypatch):
     from stumps.models import Format, Match, Phase, Team
     src = EspnSource(settings)
     match = Match(match_id="m", format=Format.FIRST_CLASS, phase=Phase.LIVE,
@@ -417,14 +444,52 @@ def test_espn_multiday_timing_from_notes(settings):
             {"type": "matchdays", "text": "7,8,9,10 June 2026 (4-day match)"},
             {"type": "closeofplay", "text": "day 1 - ..."},
             {"type": "closeofplay", "text": "day 2 - ..."},
-            {"type": "closeofplay", "text": "day 3 - ..."},
         ],
     }
+    # Day 3 is today -> matched against the explicit date list, not the
+    # (stale-by-design) closeofplay count.
+    _freeze_today(monkeypatch, date(2026, 6, 9))
     src._apply_multiday_timing(match, summary)
     assert match.local_time == "16:30"
     assert match.close_time == "17:00"
     assert match.total_days == 4
-    assert match.day_number == 4  # 3 completed days -> day 4 in progress
+    assert match.day_number == 3
+
+
+def test_espn_multiday_day_one_with_no_closeofplay(settings, monkeypatch):
+    # Day 1 has no closeofplay notes yet; the date list still pins it to Day 1
+    # (the old count-based path left day_number unset here).
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    match = Match(match_id="m", format=Format.FIRST_CLASS, phase=Phase.LIVE,
+                  teams=[Team("Surrey"), Team("Hampshire")])
+    summary = {
+        "header": {"competitions": [{"status": {"presentLocalTime": "11:00"}}]},
+        "notes": [{"type": "matchdays", "text": "12,13,14,15 June 2026 (4-day match)"}],
+    }
+    _freeze_today(monkeypatch, date(2026, 6, 12))
+    src._apply_multiday_timing(match, summary)
+    assert match.total_days == 4
+    assert match.day_number == 1
+
+
+def test_espn_multiday_timing_closeofplay_fallback(settings):
+    # When the dates can't be parsed, fall back to counting closeofplay notes.
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    match = Match(match_id="m", format=Format.FIRST_CLASS, phase=Phase.LIVE,
+                  teams=[Team("Surrey"), Team("Hampshire")])
+    summary = {
+        "header": {"competitions": [{"status": {}}]},
+        "notes": [
+            {"type": "matchdays", "text": "(4-day match)"},
+            {"type": "closeofplay", "text": "day 1 - ..."},
+            {"type": "closeofplay", "text": "day 2 - ..."},
+        ],
+    }
+    src._apply_multiday_timing(match, summary)
+    assert match.total_days == 4
+    assert match.day_number == 3  # 2 completed days -> day 3 in progress
 
 
 def test_espn_completed_falls_back_to_summary(settings):

@@ -17,6 +17,7 @@ Field access is defensive; if ESPN changes shape we degrade rather than crash.
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any
 
 from stumps import config
@@ -516,14 +517,31 @@ class EspnSource(DataSource):
             match.close_time = f"{int(m.group(1)):02d}:{m.group(2)}"
 
         days = (by_type.get("matchdays") or [{}])[0].get("text") or ""
+        dates = _parse_match_dates(days)
         m = re.search(r"\((\d+)\s*-?\s*day", days)
         if m:
             match.total_days = int(m.group(1))
+        elif dates:
+            match.total_days = len(dates)
 
-        # One `closeofplay` note per completed day -> current day is the next one.
-        completed = len(by_type.get("closeofplay") or [])
-        if completed and match.total_days:
-            match.day_number = min(match.total_days, completed + 1)
+        # Current day. The `matchdays` note lists every scheduled date, so match
+        # today against it — this is accurate from day one (unlike counting
+        # `closeofplay` notes, which can't see day 1 because none exist yet).
+        # Fall back to that count (one note per completed day) when the dates
+        # can't be parsed.
+        day_number = None
+        if dates:
+            if date.today() in dates:
+                day_number = dates.index(date.today()) + 1
+            elif date.today() < dates[0]:
+                day_number = 1
+            else:
+                day_number = len(dates)
+        elif match.total_days:
+            completed = len(by_type.get("closeofplay") or [])
+            day_number = min(match.total_days, completed + 1)
+        if day_number is not None:
+            match.day_number = day_number
 
     def _recent_balls(self, event_id: str, limit: int = 10) -> list[Ball]:
         """Most recent deliveries (newest first). Commentary paginates
@@ -702,6 +720,39 @@ def _find_roster(rosters: list[dict], team_name: str) -> list[dict]:
         if (_dig(roster, "team", "displayName") or "").lower() == team_name.lower():
             return roster.get("roster") or []
     return []
+
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun",
+     "jul", "aug", "sep", "oct", "nov", "dec"], start=1)}
+
+
+def _parse_match_dates(text: str) -> list[date]:
+    """Parse the scheduled play dates from a `matchdays` note, in order, e.g.
+    '12,13,14,15 June 2026 (4-day match)' -> the four June dates. A run of day
+    numbers is closed by the month that follows it (so cross-month spans like
+    '31 May, 1,2 June 2026' work); the trailing year applies to all. Returns []
+    if it can't be parsed (the rare year rollover is not handled)."""
+    text = re.sub(r"\(.*?\)", "", text)
+    ym = re.search(r"\d{4}", text)
+    if not ym:
+        return []
+    year = int(ym.group())
+    out: list[date] = []
+    pending: list[int] = []
+    for tok in re.findall(r"[A-Za-z]+|\d+", text[: ym.start()]):
+        if tok.isdigit():
+            pending.append(int(tok))
+            continue
+        month = _MONTHS.get(tok[:3].lower())
+        if month:
+            for day in pending:
+                try:
+                    out.append(date(year, month, day))
+                except ValueError:
+                    pass
+            pending = []
+    return out
 
 
 def _parse_day(status: str) -> tuple[int | None, int | None]:
