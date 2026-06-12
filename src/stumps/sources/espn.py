@@ -197,6 +197,67 @@ class EspnSource(DataSource):
                     upcoming.setdefault(match.match_id, match)
         return list(upcoming.values())
 
+    #: How many months to walk outward from the current one when hunting a
+    #: team's last result / next fixture (≈ a year either way covers any gap
+    #: between a side's matches; in season the current month usually has both).
+    _LAST_NEXT_MONTH_CAP = 13
+
+    def fetch_team_last_next(self, object_id: str) -> list[Match]:
+        """A team's most-recent finished match and next scheduled one.
+
+        The scoreboard header accepts `&team={id}&dates=YYYYMM`, returning *all*
+        of that team's matches in a month (past and future) in one cached call —
+        so this is one call in season, walking to adjacent months only when the
+        current one has no result / no fixture. Unbounded by the broad
+        results/upcoming day-window."""
+        if not object_id:
+            return []
+        from datetime import date
+
+        today = date.today()
+        last = self._scan_months(object_id, today, forward=False)
+        nxt = self._scan_months(object_id, today, forward=True)
+        return [m for m in (last, nxt) if m is not None]
+
+    def _months_from(self, today, forward: bool):
+        """(year, month) pairs starting at the current month, stepping one month
+        in `forward`'s direction, up to the cap."""
+        year, month = today.year, today.month
+        step = 1 if forward else -1
+        for _ in range(self._LAST_NEXT_MONTH_CAP):
+            yield year, month
+            month += step
+            if month > 12:
+                month, year = 1, year + 1
+            elif month < 1:
+                month, year = 12, year - 1
+
+    def _scan_months(self, object_id: str, today, forward: bool) -> Match | None:
+        """Walk months from the current one outward and return the closest
+        upcoming fixture (`forward`) or most-recent finished result, or None."""
+        iso_today = today.isoformat()
+        for year, month in self._months_from(today, forward):
+            try:
+                data = self._get(f"{_SCOREBOARD}&team={object_id}&dates={year}{month:02d}")
+            except SourceError:
+                continue
+            best: Match | None = None
+            for match in self._parse_scoreboard(data):
+                day = (match.starts_at or "")[:10]
+                if not day:
+                    continue
+                if forward:
+                    if match.phase is Phase.UPCOMING and day >= iso_today:
+                        if best is None or day < (best.starts_at or "")[:10]:
+                            best = match
+                elif match.phase is Phase.COMPLETE and day <= iso_today:
+                    match.finished_on = day
+                    if best is None or day > (best.finished_on or ""):
+                        best = match
+            if best is not None:
+                return best  # closest month wins; we walk outward
+        return None
+
     def _event_to_match(self, event: dict, league_id: str, series_name: str) -> Match:
         cls = event.get("class") or {}
         fmt = self._format(cls, event.get("eventType", ""))
@@ -282,8 +343,10 @@ class EspnSource(DataSource):
             name = t.get("displayName") or t.get("name") or c.get("displayName") or "?"
             teams.append(Team(
                 name=name,
-                short_name=t.get("abbreviation") or name[:3].upper(),
-                object_id=str(t.get("id") or "") or None,
+                short_name=t.get("abbreviation") or c.get("abbreviation") or name[:3].upper(),
+                # The per-event summary nests the id under `team`; the scoreboard
+                # header (and team-/month-scoped queries) put it on the competitor.
+                object_id=str(t.get("id") or c.get("id") or "") or None,
             ))
             score = c.get("score")
             if score:

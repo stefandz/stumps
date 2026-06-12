@@ -57,6 +57,17 @@ class DataSource(ABC):
         `fetch_current_matches` already covers). Default none."""
         return []
 
+    def fetch_team_last_next(self, object_id: str) -> list[Match]:
+        """A followed team's most-recent finished match and next scheduled one,
+        regardless of how far away they are — so a core team's last result and
+        next fixture always show, even out of the broad results/upcoming window.
+
+        Returns 0–2 matches (the completed one stamped with `finished_on`).
+        Default none — only sources that can query a team's whole schedule
+        override this.
+        """
+        return []
+
 
 class DiskCache:
     """Tiny TTL cache for raw JSON payloads, keyed by an opaque string.

@@ -69,7 +69,22 @@ sources/* ── Match objects ──> prioritise ──> render
   the live list (deduped by id, live wins) so results that aged out of the live
   feed still show; `fetch(upcoming_days=N)` likewise merges `fetch_upcoming(N)`
   (future `&dates=` headers) so core teams' coming fixtures show with a local
-  "Starts …" time. A successful real fetch is pickled to `last_good.pkl`; if all
+  "Starts …" time. **Followed teams also get their last result + next fixture
+  *always* shown** (`fetch(followed_teams=…, last_next=True)`, default on;
+  `Preferences.followed_last_next` / `--no-last-next`), regardless of the day-
+  windows above — for both senior squads (men's + women's). It resolves each
+  followed name to ESPN team object-ids via `resolve_squad_ids`: curated
+  `config.SENIOR_SQUADS` seeds first (England men=1/women=975, so the default
+  works cold), else a discovered name→id map (`team_ids.json`, accreted from
+  every team seen in any feed by `_record_team_ids`) matched by *exact* name
+  (the token and "<token> women" — exact-match keeps it to senior sides, not
+  Lions/A/U19). Each id's bookends come from `EspnSource.fetch_team_last_next`,
+  which exploits the scoreboard header accepting **`&team={id}&dates=YYYYMM`**
+  (a whole month of one team's matches, past+future, one cached call — `&dates=`
+  takes a single day *or* month, never a range), walking to adjacent months only
+  when the current one lacks a result/fixture. Merged deduped (live wins);
+  finished bookends carry `finished_on` so the renderer dates older ones.
+  A successful real fetch is pickled to `last_good.pkl`; if all
   live sources later fail, the aggregator serves that snapshot (≤12h old) with
   `FetchResult.stale_as_of` set — "cached (as of …)" — in preference to demo. `fixtures.py` is the offline `DemoSource` and the single source
   of sample data for `--demo` and tests.

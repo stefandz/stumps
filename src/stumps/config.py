@@ -19,6 +19,18 @@ from pathlib import Path
 #: separately (see ENGLISH_DOMESTIC_TEAMS) — this is the *national* team only.
 ENGLAND_NAMES: frozenset[str] = frozenset({"england", "england women", "eng"})
 
+#: Seed of ESPNcricinfo team object-ids for a followed name's *senior* squads, so
+#: a core team's last result + next fixture can always be fetched (one month-
+#: scoped scoreboard call per id) even when the side is idle and nothing it
+#: played has been seen in a feed yet. Keyed by the lowercased follow token →
+#: {"men": id, "women": id} (either may be absent). England (the default follow)
+#: is seeded so it works out of the box; every other team is discovered
+#: opportunistically from feeds (see Aggregator), so this stays small and only
+#: needs entries to cover the cold-start / long-off-season case.
+SENIOR_SQUADS: dict[str, dict[str, str]] = {
+    "england": {"men": "1", "women": "975"},
+}
+
 #: The 12 ICC full-member (Test-status) nations. A "top-tier Test" is a Test
 #: match between two of these. Matched case-insensitively against team names.
 TOP_TIER_TEST_NATIONS: frozenset[str] = frozenset(

@@ -52,6 +52,12 @@ window (one cached fetch per day), `--no-results` turns it off. This pulls in
 games even after they drop off the live feed — so you won't miss yesterday's
 England result.
 
+**Your followed teams' last result and next fixture always show**, however far
+outside those windows they fall — for both the men's and women's senior side
+(so following England surfaces England Men *and* England Women). Off-season or
+mid-tour, you always see where they last finished and when they're next on.
+`--no-last-next` turns it off.
+
 ## Install
 
 ```bash
@@ -77,6 +83,7 @@ stumps --results 3      # also show the last 3 days of followed/domestic results
 stumps --no-results     # only today's matches (don't look back)
 stumps --core-results   # keep recent results to your core teams only
 stumps --upcoming 7     # also show your teams' fixtures over the next 7 days
+stumps --no-last-next   # don't force-show each followed team's last/next game
 stumps --all            # include every match, not just ones of interest
 stumps --refresh 30     # live-refresh every 30s until Ctrl-C
 stumps --refresh 30 --notify   # + desktop alert on a wicket/result for your team
@@ -155,6 +162,7 @@ domestic = "india"                    # home domestic scene (any full member, or
 cricketdata_api_key = "…"            # optional fallback / augmentation key
 results_days = 2                      # days of past results to pull in (0 = off)
 upcoming_days = 3                     # days of upcoming fixtures to pull in (0 = off)
+last_next = true                      # always show followed teams' last result + next fixture
 notify = true                         # desktop alerts on a wicket/result (with --refresh)
 standings = true                      # always append league tables
 core_results = false                  # keep history to your core teams only

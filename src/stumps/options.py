@@ -54,6 +54,10 @@ class Preferences:
     #: How many days ahead to pull in scheduled fixtures (your core teams);
     #: 0 disables. Default shows the next few days.
     upcoming_days: int = 3
+    #: Always show each followed team's most-recent result and next fixture
+    #: (men's and women's senior squads), however far outside the day-windows
+    #: above they fall. On by default; --no-last-next opts out.
+    followed_last_next: bool = True
 
     # C — display
     compact: bool = False
@@ -91,6 +95,8 @@ class Preferences:
             prefs.results_days = int(config["results_days"])
         if "upcoming_days" in config:
             prefs.upcoming_days = int(config["upcoming_days"])
+        if "last_next" in config:
+            prefs.followed_last_next = bool(config["last_next"])
         # Boolean display/behaviour toggles: config sets the default; the
         # corresponding store_true flag can only turn it on (no off-flag).
         prefs.notify = bool(config.get("notify", prefs.notify))
@@ -149,6 +155,8 @@ class Preferences:
             prefs.upcoming_days = max(0, args.upcoming)
         if not prefs.show_upcoming:
             prefs.upcoming_days = 0  # --no-upcoming: don't even fetch them
+        if getattr(args, "no_last_next", False):
+            prefs.followed_last_next = False
         prefs.use_multiday_model = getattr(args, "test_model", False)
         prefs.json_output = getattr(args, "json", False)
         prefs.oneline = getattr(args, "oneline", False)

@@ -110,6 +110,9 @@ def _show_parser() -> argparse.ArgumentParser:
     b.add_argument("--upcoming", type=int, metavar="DAYS", default=None,
                    help="include scheduled fixtures for your teams over the next "
                         "DAYS days (default 3; 0 to disable)")
+    b.add_argument("--no-last-next", action="store_true",
+                   help="don't always show each followed team's most-recent "
+                        "result and next fixture (men's & women's)")
 
     c = p.add_argument_group("display")
     c.add_argument("--compact", action="store_true", help="one line per match")
@@ -197,7 +200,9 @@ def _run_show(args: argparse.Namespace) -> int:
 
     def run_once() -> None:
         result = agg.fetch(lookback_days=prefs.results_days,
-                           upcoming_days=prefs.upcoming_days)
+                           upcoming_days=prefs.upcoming_days,
+                           followed_teams=prefs.followed_teams,
+                           last_next=prefs.followed_last_next)
         if prefs.match_query:
             run_detail(result, prefs.match_query)
             return

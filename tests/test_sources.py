@@ -618,3 +618,150 @@ def test_demo_source_has_england_and_chase(settings):
     assert any(
         inns.target for m in matches for inns in m.innings if inns.target
     )
+
+
+# -- followed team last result / next fixture -------------------------------
+
+
+def _month_event(eid, day, state):
+    ev = _espn_event()
+    ev["id"] = eid
+    ev["date"] = f"{day}T10:00:00Z"
+    ev["fullStatus"] = {"type": {"state": state, "detail": state}}
+    if state == "post":
+        ev["competitors"][0]["winner"] = True
+    return ev
+
+
+def _month_payload(events):
+    return {"sports": [{"leagues": [{"id": "9", "name": "S", "events": events}]}]}
+
+
+def test_espn_scan_months_picks_latest_result_and_next_fixture(settings, monkeypatch):
+    from datetime import date
+
+    src = EspnSource(settings)
+
+    def fake_get(url):
+        assert "team=975" in url and "dates=202606" in url  # current month only
+        return _month_payload([
+            _month_event("r1", "2026-06-02", "post"),   # older result
+            _month_event("r2", "2026-06-10", "post"),   # latest result <= today
+            _month_event("liv", "2026-06-12", "in"),    # in play -> neither
+            _month_event("n1", "2026-06-16", "pre"),    # next fixture
+            _month_event("n2", "2026-06-20", "pre"),    # later fixture
+        ])
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    today = date(2026, 6, 12)
+    last = src._scan_months("975", today, forward=False)
+    nxt = src._scan_months("975", today, forward=True)
+    assert last.match_id == "r2" and last.finished_on == "2026-06-10"
+    assert nxt.match_id == "n1"
+
+
+def test_espn_scan_months_walks_to_adjacent_month(settings, monkeypatch):
+    from datetime import date
+
+    src = EspnSource(settings)
+    seen = []
+
+    def fake_get(url):
+        seen.append(url)
+        if "dates=202606" in url:        # current month: only an upcoming game
+            return _month_payload([_month_event("n", "2026-06-20", "pre")])
+        if "dates=202605" in url:        # previous month: a finished result
+            return _month_payload([_month_event("old", "2026-05-28", "post")])
+        return _month_payload([])
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    last = src._scan_months("975", date(2026, 6, 12), forward=False)
+    assert last.match_id == "old" and last.finished_on == "2026-05-28"
+    assert any("dates=202605" in u for u in seen)  # it walked back a month
+
+
+def test_espn_fetch_team_last_next_combines_and_filters_none(settings, monkeypatch):
+    src = EspnSource(settings)
+    assert src.fetch_team_last_next("") == []  # no id -> nothing
+
+    from stumps.models import Format, Match, Team
+    last = Match("L", Format.ODI, [Team("England")], phase=Phase.COMPLETE)
+    monkeypatch.setattr(src, "_scan_months",
+                        lambda oid, today, forward: last if not forward else None)
+    out = src.fetch_team_last_next("1")
+    assert [m.match_id for m in out] == ["L"]  # only the result; missing next dropped
+
+
+def test_resolve_squad_ids_seed_and_discovery():
+    from stumps.sources.aggregator import resolve_squad_ids
+
+    # Seeded England -> both senior squads, regardless of what's been discovered.
+    assert resolve_squad_ids(["england"], {}) == ["1", "975"]
+
+    # Non-seeded nation resolves by exact name + "<token> women" from discovery,
+    # and must NOT pull in age-group / A / Lions sides sharing the token.
+    discovered = {
+        "australia": "5", "australia women": "6",
+        "australia a": "7", "australia under-19s": "8",
+    }
+    ids = resolve_squad_ids(["australia"], discovered)
+    assert ids == ["5", "6"]
+    assert "7" not in ids and "8" not in ids
+
+    # A franchise with only a men's side resolves to just that, and ids dedupe.
+    assert resolve_squad_ids(["sunrisers hyderabad"],
+                             {"sunrisers hyderabad": "42"}) == ["42"]
+
+
+def test_aggregator_records_and_persists_team_ids(settings):
+    from stumps.models import Format, Match, Team
+
+    agg = Aggregator(settings)
+    matches = [
+        Match("m", Format.WT20I,
+              [Team("England Women", object_id="975"), Team("Sri Lanka Women")]),
+        Match("n", Format.ODI, [Team("England", object_id="1"), Team("India")]),
+    ]
+    id_map = agg._record_team_ids(matches)
+    assert id_map["england women"] == "975" and id_map["england"] == "1"
+    # Persisted across instances.
+    assert Aggregator(settings)._load_team_ids()["england women"] == "975"
+
+
+def test_aggregator_fetch_merges_last_next(settings, monkeypatch):
+    from stumps.models import Format, Match, Team
+
+    # Live feed has England's current ODI; the bookends come from the schedule.
+    live = [Match("live1", Format.ODI,
+                  [Team("England", object_id="1"), Team("India", object_id="6")],
+                  phase=Phase.LIVE)]
+    bookends = {
+        "1": [Match("res-m", Format.TEST, [Team("England")], phase=Phase.COMPLETE),
+              Match("fix-m", Format.T20I, [Team("England")], phase=Phase.UPCOMING)],
+        "975": [Match("res-w", Format.WT20I, [Team("England Women")],
+                      phase=Phase.COMPLETE)],
+    }
+    monkeypatch.setattr(EspnSource, "fetch_current_matches", lambda self: live)
+    monkeypatch.setattr(EspnSource, "fetch_team_last_next",
+                        lambda self, oid: bookends.get(oid, []))
+
+    agg = Aggregator(settings)
+    result = agg.fetch(followed_teams=["england"], last_next=True)
+    ids = [m.match_id for m in result.matches]
+    assert ids[0] == "live1"            # live result preserved, first
+    assert set(ids) == {"live1", "res-m", "fix-m", "res-w"}  # both squads' bookends
+
+
+def test_aggregator_last_next_off_by_flag(settings, monkeypatch):
+    from stumps.models import Format, Match, Team
+
+    live = [Match("live1", Format.ODI, [Team("England", object_id="1")],
+                  phase=Phase.LIVE)]
+    monkeypatch.setattr(EspnSource, "fetch_current_matches", lambda self: live)
+    monkeypatch.setattr(
+        EspnSource, "fetch_team_last_next",
+        lambda self, oid: (_ for _ in ()).throw(AssertionError("should not fetch")))
+
+    agg = Aggregator(settings)
+    result = agg.fetch(followed_teams=["england"], last_next=False)
+    assert [m.match_id for m in result.matches] == ["live1"]

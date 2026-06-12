@@ -6,12 +6,14 @@ the built-in demo data (so the CLI always shows *something*, clearly labelled).
 
 from __future__ import annotations
 
+import json
 import pickle
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from stumps import config
 from stumps.config import Settings
 from stumps.models import Match, Phase
 from stumps.sources.base import DataSource, SourceError
@@ -22,6 +24,33 @@ from stumps.sources.fixtures import DemoSource
 #: A last-good snapshot older than this is too stale to pass off as "current";
 #: we drop to demo data instead.
 _SNAPSHOT_MAX_AGE = 12 * 3600
+
+
+def resolve_squad_ids(
+    followed_teams: list[str], discovered: dict[str, str]
+) -> list[str]:
+    """ESPNcricinfo object-ids for the *senior* men's/women's squads behind each
+    followed name, for the always-show last-result/next-fixture fetch.
+
+    Curated seeds (``config.SENIOR_SQUADS``) win; otherwise we match the
+    ``discovered`` name→id map (learned from feeds) by *exact* team name — the
+    token itself (e.g. "australia", "sunrisers hyderabad") and "<token> women"
+    (e.g. "australia women"). Exact-match keeps it to the senior sides: it
+    deliberately won't pull in "England Lions"/"India A"/"… Under-19s", which a
+    loose substring on the follow token would."""
+    ids: list[str] = []
+    for token in followed_teams:
+        seed = config.SENIOR_SQUADS.get(token)
+        if seed is not None:
+            ids.extend(v for v in (seed.get("men"), seed.get("women")) if v)
+            continue  # a curated seed is authoritative for that team
+        for name in (token, f"{token} women"):
+            found = discovered.get(name)
+            if found:
+                ids.append(found)
+    # de-dupe, preserve order
+    seen: set[str] = set()
+    return [i for i in ids if not (i in seen or seen.add(i))]
 
 
 @dataclass
@@ -45,7 +74,14 @@ class Aggregator:
             ]
         self._demo = DemoSource(settings)
 
-    def fetch(self, *, lookback_days: int = 0, upcoming_days: int = 0) -> FetchResult:
+    def fetch(
+        self,
+        *,
+        lookback_days: int = 0,
+        upcoming_days: int = 0,
+        followed_teams: list[str] | None = None,
+        last_next: bool = False,
+    ) -> FetchResult:
         notices: list[str] = []
         for src in self.sources:
             if isinstance(src, CricketDataSource) and not src.available:
@@ -60,6 +96,14 @@ class Aggregator:
                 matches = self._merge(matches, src.fetch_recent_results, lookback_days)
             if upcoming_days > 0:
                 matches = self._merge(matches, src.fetch_upcoming, upcoming_days)
+            # Always-show a followed team's last result + next fixture, however
+            # far outside the day-window they fall. Learn team object-ids from
+            # whatever we've fetched so far (and past runs), then fetch each
+            # followed squad's bookends — deduped against the live list.
+            if last_next and followed_teams:
+                id_map = self._record_team_ids(matches)
+                matches = self._merge_last_next(
+                    matches, src, resolve_squad_ids(followed_teams, id_map))
             if not isinstance(src, DemoSource):
                 self._save_snapshot(matches)
             return FetchResult(matches, src, used_fallback=False, notices=notices)
@@ -94,6 +138,61 @@ class Aggregator:
             return current
         seen = {m.match_id for m in current}
         return current + [m for m in extra if m.match_id not in seen]
+
+    def _merge_last_next(
+        self, current: list[Match], src: DataSource, squad_ids: list[str]
+    ) -> list[Match]:
+        """Append each squad's most-recent result + next fixture, deduped against
+        the live list (which wins, being freshest). Best-effort per id — a single
+        squad's failure never loses the others or the live result."""
+        seen = {m.match_id for m in current}
+        extra: list[Match] = []
+        for object_id in squad_ids:
+            try:
+                bookends = src.fetch_team_last_next(object_id)
+            except Exception:
+                continue
+            for match in bookends:
+                if match.match_id and match.match_id not in seen:
+                    seen.add(match.match_id)
+                    extra.append(match)
+        return current + extra
+
+    # -- discovered team object-ids -----------------------------------------
+
+    def _team_ids_path(self) -> Path:
+        return self.settings.cache_dir / "team_ids.json"
+
+    def _record_team_ids(self, matches: list[Match]) -> dict[str, str]:
+        """Accrue a name→object-id map from the teams we've seen (across runs),
+        so a followed side's squads can be resolved even when idle today. Keyed
+        by exact lowercased team name ("england", "england women") — cricinfo
+        suffixes women's sides with "Women", so men's/women's don't collide.
+        Returns the merged, persisted map."""
+        id_map = self._load_team_ids()
+        changed = False
+        for match in matches:
+            for team in match.teams:
+                if team.object_id and team.name:
+                    key = team.name.lower()
+                    if id_map.get(key) != team.object_id:
+                        id_map[key] = team.object_id
+                        changed = True
+        if changed:
+            try:
+                with self._team_ids_path().open("w", encoding="utf-8") as fh:
+                    json.dump(id_map, fh)
+            except OSError:
+                pass  # best-effort cache
+        return id_map
+
+    def _load_team_ids(self) -> dict[str, str]:
+        try:
+            with self._team_ids_path().open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return {k: str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            return {}
 
     def _snapshot_path(self) -> Path:
         return self.settings.cache_dir / "last_good.pkl"
