@@ -258,6 +258,33 @@ def test_test_heuristic_gettable_chase_favours_batting_side():
     assert est.probabilities["Hampshire"] > est.probabilities["Draw"]
 
 
+def _big_chase_match(day=3, total=4):
+    """Yorkshire 469 & 246/6d, Warwickshire 263 & 44/1 — chasing 409 in a day."""
+    return Match(
+        match_id="bigchase", format=Format.FIRST_CLASS, phase=Phase.STUMPS,
+        teams=[Team("Yorkshire", "YOR"), Team("Warwickshire", "WAR")],
+        day_number=day, total_days=total,
+        innings=[
+            Innings("Yorkshire", "Warwickshire", 1, 469, 10, 130.0, all_out=True, closed=True),
+            Innings("Warwickshire", "Yorkshire", 2, 263, 10, 80.0, all_out=True, closed=True),
+            Innings("Yorkshire", "Warwickshire", 3, 246, 6, 60.0, declared=True, closed=True),
+            Innings("Warwickshire", "Yorkshire", 4, 44, 1, 15.0),
+        ],
+    )
+
+
+def test_test_heuristic_huge_fourth_innings_target_is_near_hopeless():
+    # CricViz reference (Yorks v Warwicks, day-3 stumps): Yorks 70 / Draw 29 /
+    # Warwicks 1. A 409 chase in a day is essentially bowl-out-or-draw, not a
+    # real chance for the chasing side — and the bowling side is the favourite.
+    est = estimate(_big_chase_match())
+    p = est.probabilities
+    assert p["Warwickshire"] < 0.05           # chasing 409 ~ hopeless
+    assert p["Yorkshire"] > p["Draw"]         # bowling side favoured to bowl them out
+    assert p["Yorkshire"] > 0.55
+    assert abs(sum(p.values()) - 1.0) < 0.01
+
+
 def _third_innings_match(*, third_runs, third_wkts, day=3, total=4):
     """Real-shaped follow-on: Essex 401, Leicestershire 187 (follow-on), then
     batting again in the 3rd innings — a modest lead with the *opponent* to

@@ -179,6 +179,18 @@ def _first_innings_estimate(match: Match) -> WinEstimate | None:
     )
 
 
+#: Highest fourth-innings target realistically overhauled (~the record chase of
+#: 418). Chase feasibility falls away steeply beyond it, so a 400+ target is
+#: near-hopeless however much time remains — the contest becomes bowl-out vs draw.
+_MAX_REALISTIC_CHASE = 380.0
+_CHASE_FEASIBILITY_SLOPE = 0.14
+#: Overs a side batting to save the game survives per wicket on a wearing
+#: fourth-innings pitch (a full innings ≈ 85 overs). Sets how readily the
+#: bowling side can take the standing wickets in the overs left.
+_OVERS_PER_DEFENSIVE_WICKET = 8.5
+_BOWL_OUT_SLOPE = 0.42
+
+
 def _chase_outcome(
     target: float, overs: float, chaser_wih: int
 ) -> tuple[float, float, float]:
@@ -203,13 +215,14 @@ def _chase_outcome(
     wkt_ok = _logistic(0.5 * (chaser_wih - 3))
     # Absolute size matters too: a low required rate over a huge number of overs
     # still implies a massive chase, and 400+ fourth-innings targets are almost
-    # never overhauled however much time there is. (~380 = highest real chase.)
-    feasible = _logistic(0.015 * (380.0 - target))
+    # never overhauled however much time there is.
+    feasible = _logistic(_CHASE_FEASIBILITY_SLOPE * (_MAX_REALISTIC_CHASE - target))
     p_chase = gettable * wkt_ok * feasible
-    # Time to bowl them out? A side batting to save the game loses a wicket
-    # roughly every ~12.5 overs; enough such overs to take the standing wickets
-    # favours the bowling side.
-    p_bowl = (1.0 - p_chase) * _logistic(0.55 * (overs / 12.5 - chaser_wih))
+    # Time to bowl them out? Compare the wickets the bowling side can expect to
+    # take in the overs left against the standing wickets — enough favours a win,
+    # not enough leaves a draw. (When the chase is dead this is the whole story.)
+    expected_wickets = overs / _OVERS_PER_DEFENSIVE_WICKET
+    p_bowl = (1.0 - p_chase) * _logistic(_BOWL_OUT_SLOPE * (expected_wickets - chaser_wih))
     p_draw = max(0.0, 1.0 - p_chase - p_bowl)
     return p_chase, p_bowl, p_draw
 
