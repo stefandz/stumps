@@ -258,6 +258,45 @@ def test_test_heuristic_gettable_chase_favours_batting_side():
     assert est.probabilities["Hampshire"] > est.probabilities["Draw"]
 
 
+def _third_innings_match(*, third_runs, third_wkts, day=3, total=4):
+    """Real-shaped follow-on: Essex 401, Leicestershire 187 (follow-on), then
+    batting again in the 3rd innings — a modest lead with the *opponent* to
+    chase last, so the bowling side (Essex) is favoured, not the batting side."""
+    return Match(
+        match_id="md3", format=Format.FIRST_CLASS, phase=Phase.STUMPS,
+        teams=[Team("Leicestershire", "LEI"), Team("Essex", "ESS")],
+        day_number=day, total_days=total,
+        innings=[
+            Innings("Essex", "Leicestershire", 1, 401, 10, 97.4, all_out=True, closed=True),
+            Innings("Leicestershire", "Essex", 2, 187, 10, 63.2, all_out=True, closed=True),
+            Innings("Leicestershire", "Essex", 3, third_runs, third_wkts, 117.0),
+        ],
+    )
+
+
+def test_test_heuristic_third_innings_modest_lead_favours_bowling_side():
+    # The reported bug: a follow-on side leading by 112 with 3 wickets left at
+    # stumps day 3 is NOT 76% to win — they're *setting* a small target for the
+    # opponent to chase last. Essex (bowling side) must be the favourite.
+    m = _third_innings_match(third_runs=326, third_wkts=7)  # lead 112, 3 wkts left
+    est = estimate(m)
+    assert est.method == "test-heuristic"
+    p = est.probabilities
+    assert p["Essex"] > p["Draw"] > p["Leicestershire"]
+    assert p["Essex"] > 0.5
+    assert p["Leicestershire"] < 0.1
+    assert abs(sum(p.values()) - 1.0) < 0.01  # 3-dp rounding residual
+
+
+def test_test_heuristic_third_innings_huge_lead_favours_batting_side():
+    # A commanding third-innings lead flips it back: the target becomes
+    # unchaseable and there's time to bowl the opponent out.
+    m = _third_innings_match(third_runs=560, third_wkts=4, day=2, total=4)  # lead ~346
+    est = estimate(m)
+    p = est.probabilities
+    assert p["Leicestershire"] > p["Essex"]
+
+
 # -- multi-day (Option B: model) --------------------------------------------
 
 

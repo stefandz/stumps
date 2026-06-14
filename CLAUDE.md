@@ -197,10 +197,17 @@ sources/* ── Match objects ──> prioritise ──> render
   - **limited-overs chase** → trained chase model if present, else a transparent
     run-rate heuristic; **first innings** → a projected-score heuristic.
   - **multi-day** → the **overs-aware heuristic by default** (`_test_estimate`):
-    for a fourth innings it's a proper win/lose/**draw** 3-way (the side batting
-    last can draw by surviving, so a big deficit is *not* a near-loss — this is
-    what made the old aggregate-lead lean say "96% to the team that's actually
-    going to draw"); innings 1–3 keep a lead-and-time lean. The opt-in trained
+    for a fourth innings it's a proper win/lose/**draw** 3-way (`_chase_outcome`:
+    the side batting last can draw by surviving, so a big deficit is *not* a
+    near-loss — this is what made the old aggregate-lead lean say "96% to the
+    team that's actually going to draw"; chaseability is judged by required rate,
+    wickets, *and* absolute target size, since 400+ chases almost never happen
+    however much time there is). The **third innings** is *not* a lead-dominance
+    lean (`_third_innings_probs`): the batting side is *setting* a target for the
+    opponent to chase last, so a modest lead favours the **bowling** side — it
+    projects the final lead (current + ~24 runs/remaining wicket), then runs the
+    implied fourth-innings chase through the same `_chase_outcome`. Innings 1–2
+    keep the lead-and-time lean (`_early_innings_probs`). The opt-in trained
     multi-day model is used only with `--test-model` (`Preferences.use_multiday_model`),
     falling back to the heuristic if the model is absent.
   - **The dominant input for multi-day is overs remaining**, which no feed gives

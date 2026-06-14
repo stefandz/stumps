@@ -179,33 +179,80 @@ def _first_innings_estimate(match: Match) -> WinEstimate | None:
     )
 
 
-def _fourth_innings_probs(state: MultiDayState) -> tuple[float, float, float]:
-    """(batting-side win, bowling-side win, draw) for a fourth-innings position.
+def _chase_outcome(
+    target: float, overs: float, chaser_wih: int
+) -> tuple[float, float, float]:
+    """(chaser win, defender win via bowl-out, draw) for a side chasing
+    ``target`` in ``overs`` with ``chaser_wih`` wickets standing.
 
-    The key asymmetry the old lead-based lean missed: the side batting last can
-    secure a *draw* simply by surviving the overs left, so a big deficit is not a
-    near-certain loss. A result needs either the target reached (batting win) or
-    all standing wickets taken in time (bowling win)."""
-    overs = max(0.0, state.overs_remaining)
-    wih = state.wickets_in_hand
-    need = state.runs_to_win
-    if need <= 0:                      # target already overhauled
+    The asymmetry a lead-based lean misses: the side batting last can secure a
+    *draw* simply by surviving the overs left, so a big target is not a
+    near-certain loss for them. A result needs either the target reached (chaser
+    wins) or all standing wickets taken in time (defender wins). Shared by the
+    real fourth innings and the *projected* fourth innings implied by a
+    third-innings position."""
+    if target <= 0:                    # target already overhauled / no lead to defend
         return 1.0, 0.0, 0.0
-    if wih <= 0 or overs <= 0:         # innings over / time up, target not reached
+    if chaser_wih <= 0 or overs <= 0:  # innings over / time up, target not reached
         return 0.0, 1.0, 0.0
 
-    rrr = need / overs                 # runs per over required
+    rrr = target / overs               # runs per over required
     # Can the target realistically be chased? ~4.5 rpo is a stiff-but-doable
     # fourth-innings rate; temper by wickets in hand.
     gettable = _logistic(1.1 * (4.5 - rrr))
-    wkt_ok = _logistic(0.5 * (wih - 3))
-    p_bat = gettable * wkt_ok
+    wkt_ok = _logistic(0.5 * (chaser_wih - 3))
+    # Absolute size matters too: a low required rate over a huge number of overs
+    # still implies a massive chase, and 400+ fourth-innings targets are almost
+    # never overhauled however much time there is. (~380 = highest real chase.)
+    feasible = _logistic(0.015 * (380.0 - target))
+    p_chase = gettable * wkt_ok * feasible
     # Time to bowl them out? A side batting to save the game loses a wicket
     # roughly every ~12.5 overs; enough such overs to take the standing wickets
     # favours the bowling side.
-    p_bowl = (1.0 - p_bat) * _logistic(0.55 * (overs / 12.5 - wih))
-    p_draw = max(0.0, 1.0 - p_bat - p_bowl)
-    return p_bat, p_bowl, p_draw
+    p_bowl = (1.0 - p_chase) * _logistic(0.55 * (overs / 12.5 - chaser_wih))
+    p_draw = max(0.0, 1.0 - p_chase - p_bowl)
+    return p_chase, p_bowl, p_draw
+
+
+def _fourth_innings_probs(state: MultiDayState) -> tuple[float, float, float]:
+    """(batting-side win, bowling-side win, draw) for a fourth-innings position.
+    The batting side is the chaser; the bowling side wins by bowling them out."""
+    return _chase_outcome(
+        float(state.runs_to_win), max(0.0, state.overs_remaining), state.wickets_in_hand
+    )
+
+
+#: Rough runs a third-innings side adds per remaining wicket when projecting the
+#: target it will eventually set (first-class lower-order partnerships).
+_RUNS_PER_REMAINING_WICKET = 24.0
+#: Run rate the third-innings side bats at while extending the lead, used to
+#: estimate how many overs it consumes before the final-innings chase begins.
+_THIRD_INNINGS_RUN_RATE = 3.3
+
+
+def _third_innings_projection(state: MultiDayState) -> tuple[int, float]:
+    """Project the (target, overs-for-the-chase) the third-innings position
+    implies for the side batting *last*."""
+    extra_runs = max(0, state.wickets_in_hand) * _RUNS_PER_REMAINING_WICKET
+    target = max(0, int(round(state.lead + extra_runs + 1)))
+    overs_used = extra_runs / _THIRD_INNINGS_RUN_RATE
+    chase_overs = max(0.0, state.overs_remaining - overs_used)
+    return target, chase_overs
+
+
+def _third_innings_probs(state: MultiDayState) -> dict[str, float]:
+    """Third innings: the batting side is *setting* a target for the opponent to
+    chase last, so a modest lead favours the **bowling** side, not the batting
+    side — the opposite of a raw lead-dominance lean. We project the final lead
+    the batting side reaches, then assess the implied fourth-innings chase for
+    the bowling side (a fresh innings, 10 wickets in hand)."""
+    target, chase_overs = _third_innings_projection(state)
+    p_chaser, p_defender, p_draw = _chase_outcome(float(target), chase_overs, 10)
+    return {
+        state.batting_team: p_defender,   # set the target, must bowl the chaser out
+        state.bowling_team: p_chaser,      # bats last
+        "Draw": p_draw,
+    }
 
 
 def _early_innings_probs(state: MultiDayState) -> dict[str, float]:
@@ -251,6 +298,15 @@ def _test_estimate(match: Match) -> WinEstimate | None:
                 f"need {state.runs_to_win} at {state.required_run_rate:.1f}/over, "
                 f"{state.wickets_in_hand} wkts in hand"
             )
+    elif state.innings_number == 3:
+        probs = _third_innings_probs(state)
+        target, chase_overs = _third_innings_projection(state)
+        verb = "lead" if state.lead >= 0 else "trail"
+        extra.append(
+            f"{state.batting_team} {verb} by {abs(state.lead)} with "
+            f"{state.wickets_in_hand} wkts left; projecting ~{target} for "
+            f"{state.bowling_team} to chase in ~{chase_overs:.0f} overs"
+        )
     else:
         probs = _early_innings_probs(state)
         extra.append(f"~{state.overs_remaining:.0f} overs left in the match")
