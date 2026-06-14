@@ -188,10 +188,13 @@ def _first_innings_estimate(match: Match) -> WinEstimate | None:
 _CHASE_DIFFICULTY_MIDPOINT = 250.0
 _CHASE_FEASIBILITY_SLOPE = 0.028
 #: Overs a side batting to save the game survives per wicket on a wearing
-#: fourth-innings pitch (a full innings ≈ 85 overs). Sets how readily the
-#: bowling side can take the standing wickets in the overs left.
-_OVERS_PER_DEFENSIVE_WICKET = 8.5
-_BOWL_OUT_SLOPE = 0.42
+#: fourth-innings pitch (a full innings ≈ 95 overs). Sets how readily the
+#: bowling side can take the standing wickets in the overs left. The bowl-out
+#: slope is deliberately steep: CricViz reads show a sharp crossover around
+#: "wickets to take ≈ wickets takeable in the time" — at ~96 overs a draw is
+#: ~11% with 8 wickets standing but jumps to ~29% with 9.
+_OVERS_PER_DEFENSIVE_WICKET = 9.5
+_BOWL_OUT_SLOPE = 0.8
 
 
 def _chase_outcome(

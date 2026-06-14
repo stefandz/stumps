@@ -308,7 +308,11 @@ def test_test_heuristic_moderate_chase_still_favours_bowling_side():
     p = est.probabilities
     assert p["Worcestershire"] < 0.15        # chasing 325 ~ unlikely, not ~70%
     assert p["Middlesex"] > p["Worcestershire"]
-    assert p["Middlesex"] > p["Draw"]
+    # Bowling side is the heavy favourite with a low draw, not a draw-dominant
+    # stalemate: with only 8 wickets standing a full day is enough to bowl them
+    # out (cf. the 9-wicket Yorkshire case, where the draw is far likelier).
+    assert p["Middlesex"] > 0.65
+    assert p["Draw"] < 0.20
 
 
 def _third_innings_match(*, third_runs, third_wkts, day=3, total=4):
