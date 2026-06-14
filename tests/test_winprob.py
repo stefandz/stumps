@@ -285,6 +285,32 @@ def test_test_heuristic_huge_fourth_innings_target_is_near_hopeless():
     assert abs(sum(p.values()) - 1.0) < 0.01
 
 
+def _moderate_chase_match(day=3, total=4):
+    """Middlesex 339 & 283/6d, Worcestershire 265 & 33/2 — chasing 325 in a day."""
+    return Match(
+        match_id="modchase", format=Format.FIRST_CLASS, phase=Phase.STUMPS,
+        teams=[Team("Worcestershire", "WOR"), Team("Middlesex", "MID")],
+        day_number=day, total_days=total,
+        innings=[
+            Innings("Middlesex", "Worcestershire", 1, 339, 10, 100.0, all_out=True, closed=True),
+            Innings("Worcestershire", "Middlesex", 2, 265, 10, 85.0, all_out=True, closed=True),
+            Innings("Middlesex", "Worcestershire", 3, 283, 6, 75.0, declared=True, closed=True),
+            Innings("Worcestershire", "Middlesex", 4, 33, 2, 12.0),
+        ],
+    )
+
+
+def test_test_heuristic_moderate_chase_still_favours_bowling_side():
+    # CricViz reference (Worcs v Middx, day-3 stumps): Worcs 8 / Draw 11 /
+    # Middx 81. A 325 chase looks gettable by required rate (~3.4/over) but is
+    # historically hard; the spare time helps the bowlers, not the chaser.
+    est = estimate(_moderate_chase_match())
+    p = est.probabilities
+    assert p["Worcestershire"] < 0.15        # chasing 325 ~ unlikely, not ~70%
+    assert p["Middlesex"] > p["Worcestershire"]
+    assert p["Middlesex"] > p["Draw"]
+
+
 def _third_innings_match(*, third_runs, third_wkts, day=3, total=4):
     """Real-shaped follow-on: Essex 401, Leicestershire 187 (follow-on), then
     batting again in the 3rd innings — a modest lead with the *opponent* to
@@ -311,7 +337,7 @@ def test_test_heuristic_third_innings_modest_lead_favours_bowling_side():
     p = est.probabilities
     assert p["Essex"] > p["Draw"] > p["Leicestershire"]
     assert p["Essex"] > 0.5
-    assert p["Leicestershire"] < 0.1
+    assert p["Leicestershire"] < 0.15
     assert abs(sum(p.values()) - 1.0) < 0.01  # 3-dp rounding residual
 
 

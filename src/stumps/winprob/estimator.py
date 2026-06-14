@@ -179,11 +179,14 @@ def _first_innings_estimate(match: Match) -> WinEstimate | None:
     )
 
 
-#: Highest fourth-innings target realistically overhauled (~the record chase of
-#: 418). Chase feasibility falls away steeply beyond it, so a 400+ target is
-#: near-hopeless however much time remains — the contest becomes bowl-out vs draw.
-_MAX_REALISTIC_CHASE = 380.0
-_CHASE_FEASIBILITY_SLOPE = 0.14
+#: Fourth-innings target at which a chase's *absolute-size* feasibility is ~50%.
+#: Chasing is genuinely hard once the target climbs, even with time in hand —
+#: extra overs help the bowling side as much as the batting side. Calibrated to
+#: CricViz fourth-innings reads (a ~325 target ≈ 8% to chase, a 400+ target
+#: near-hopeless), so feasibility tapers from here rather than from the ~418
+#: record chase; the surplus probability becomes bowl-out vs draw.
+_CHASE_DIFFICULTY_MIDPOINT = 250.0
+_CHASE_FEASIBILITY_SLOPE = 0.028
 #: Overs a side batting to save the game survives per wicket on a wearing
 #: fourth-innings pitch (a full innings ≈ 85 overs). Sets how readily the
 #: bowling side can take the standing wickets in the overs left.
@@ -213,10 +216,10 @@ def _chase_outcome(
     # fourth-innings rate; temper by wickets in hand.
     gettable = _logistic(1.1 * (4.5 - rrr))
     wkt_ok = _logistic(0.5 * (chaser_wih - 3))
-    # Absolute size matters too: a low required rate over a huge number of overs
-    # still implies a massive chase, and 400+ fourth-innings targets are almost
-    # never overhauled however much time there is.
-    feasible = _logistic(_CHASE_FEASIBILITY_SLOPE * (_MAX_REALISTIC_CHASE - target))
+    # Absolute size matters too, independent of rate: a big fourth-innings target
+    # is hard to overhaul however many overs there are (the time instead helps the
+    # bowling side take wickets), so large targets taper away regardless of rrr.
+    feasible = _logistic(_CHASE_FEASIBILITY_SLOPE * (_CHASE_DIFFICULTY_MIDPOINT - target))
     p_chase = gettable * wkt_ok * feasible
     # Time to bowl them out? Compare the wickets the bowling side can expect to
     # take in the overs left against the standing wickets — enough favours a win,
