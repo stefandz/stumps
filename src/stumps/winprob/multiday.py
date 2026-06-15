@@ -74,9 +74,27 @@ def overs_remaining_estimate(match: Match) -> float:
         full_days_left = max(0, total - day)
 
     now = _parse_hhmm(match.local_time)
+    start = _parse_hhmm(match.start_time)
     close = _parse_hhmm(match.close_time)
     if match.phase is Phase.STUMPS:
-        overs_today = 0.0                         # day's play is done
+        # "Stumps" labels both genuine end-of-day *and* the morning before a new
+        # day's play begins (the feed carries the previous evening's label until
+        # the first ball). Distinguish by the clock: at or before the scheduled
+        # start, today's full allocation is still to come; otherwise the day's
+        # play really is done.
+        #
+        # When the feed didn't give a start time, fall back to a prior: a day's
+        # play spans ~7 wall-clock hours, so start ≈ close − 7h (which adapts to
+        # day/night matches), else a plain 11:00. This keeps the morning case
+        # right without a parsed start, and a genuine evening/early stumps still
+        # reads as done (now is past the prior). We only make this call with a
+        # known current time; without one we can't tell morning from evening.
+        if start is None:
+            start = (close - 7 * 60) if close is not None else 11 * 60
+        if now is not None and now <= start:
+            overs_today = float(opd)
+        else:
+            overs_today = 0.0
     elif now is not None and close is not None:
         overs_today = (max(0, close - now)) / _minutes_per_over(match.format)
         overs_today = min(overs_today, float(opd))

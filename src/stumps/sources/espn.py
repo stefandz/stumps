@@ -17,7 +17,7 @@ Field access is defensive; if ESPN changes shape we degrade rather than crash.
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from stumps import config
@@ -552,6 +552,9 @@ class EspnSource(DataSource):
         m = re.search(r"[Cc]lose\s+(\d{1,2})[.:](\d{2})", hours)
         if m:
             match.close_time = f"{int(m.group(1)):02d}:{m.group(2)}"
+        m = re.search(r"(\d{1,2})[.:](\d{2})\s+start", hours)
+        if m:
+            match.start_time = f"{int(m.group(1)):02d}:{m.group(2)}"
 
         days = (by_type.get("matchdays") or [{}])[0].get("text") or ""
         dates = _parse_match_dates(days)
@@ -568,7 +571,7 @@ class EspnSource(DataSource):
         # can't be parsed.
         day_number = None
         if dates:
-            today = date.today()
+            today = _venue_date(match.local_time)
             if today in dates:
                 day_number = dates.index(today) + 1
             elif today < dates[0]:
@@ -792,6 +795,35 @@ def _parse_match_dates(text: str) -> list[date]:
                     pass
             pending = []
     return out
+
+
+def _venue_date(local_time: str) -> date:
+    """The venue's *current* calendar date, anchored to the venue clock rather
+    than the machine's timezone.
+
+    We know UTC now (machine-timezone-independent, given a correct system clock)
+    and the venue's wall-clock (the feed's ``presentLocalTime``, HH:MM). Their
+    difference is the venue's UTC offset, which we normalise into the band every
+    multi-day cricket venue lives in — UTC−5 (West Indies, the westernmost) to
+    UTC+14 — then read the date off the venue's own clock. This removes the
+    off-by-one a machine in a different timezone would otherwise hit around the
+    venue's midnight. Falls back to the machine date when the clock is unknown."""
+    parts = (local_time or "").strip().replace(".", ":").split(":")
+    if len(parts) < 2:
+        return date.today()
+    try:
+        venue_minutes = int(parts[0]) * 60 + int(parts[1])
+    except ValueError:
+        return date.today()
+    if not (0 <= venue_minutes < 1440):
+        return date.today()
+    utc_now = datetime.now(timezone.utc)
+    utc_minutes = utc_now.hour * 60 + utc_now.minute
+    offset = venue_minutes - utc_minutes
+    # Two offsets reproduce the same wall clock (±24h apart); pick the one inside
+    # the cricket band (−5h, +19h] so the choice is unambiguous for any venue.
+    offset = ((offset + 300) % 1440) - 300
+    return (utc_now + timedelta(minutes=offset)).date()
 
 
 def _parse_day(status: str) -> tuple[int | None, int | None]:

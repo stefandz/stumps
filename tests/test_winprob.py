@@ -24,14 +24,15 @@ from stumps.sources.fixtures import sample_matches
 
 
 def _fourth_innings_match(
-    *, runs=67, wickets=2, day=4, total=4, local="16:30", close="18:00",
-    fmt=Format.FIRST_CLASS,
+    *, runs=67, wickets=2, day=4, total=4, local="16:30", start="11:00",
+    close="18:00", fmt=Format.FIRST_CLASS,
 ):
     """Surrey lead big; the side batting last (Hampshire) blocks for a draw."""
     return Match(
         match_id="md", format=fmt, phase=Phase.LIVE,
         teams=[Team("Surrey", "SUR"), Team("Hampshire", "HAM")],
-        day_number=day, total_days=total, local_time=local, close_time=close,
+        day_number=day, total_days=total, local_time=local,
+        start_time=start, close_time=close,
         innings=[
             Innings("Surrey", "Hampshire", 1, 421, 10, 110.0, all_out=True, closed=True),
             Innings("Hampshire", "Surrey", 2, 333, 10, 95.0, all_out=True, closed=True),
@@ -227,7 +228,51 @@ def test_overs_remaining_fallback_without_clock():
 
 
 def test_overs_remaining_zero_at_stumps():
-    m = _fourth_innings_match(day=4, total=4)
+    # Genuine end-of-day stumps: it's the afternoon (past the scheduled start),
+    # so today's play is done and no full days remain.
+    m = _fourth_innings_match(day=4, total=4, local="16:30", start="11:00")
+    m.phase = Phase.STUMPS
+    assert overs_remaining_estimate(m) == 0.0
+
+
+def test_overs_remaining_full_day_at_morning_of_final_day():
+    # Morning of the final day, before the first ball: the feed still carries
+    # the previous evening's "stumps" label, but a whole day is to come — must
+    # NOT collapse to zero (which produced bogus 100% probabilities).
+    m = _fourth_innings_match(day=4, total=4, local="09:30", start="11:00")
+    m.phase = Phase.STUMPS
+    # No full days left after today, but today's full ~96-over allocation remains.
+    assert overs_remaining_estimate(m) == 96.0
+
+
+def test_overs_remaining_full_day_at_morning_mid_match():
+    # Same morning-before-play case at a day-2/4 transition: today's allocation
+    # plus the two remaining full days.
+    m = _fourth_innings_match(day=2, total=4, local="09:30", start="11:00")
+    m.phase = Phase.STUMPS
+    assert overs_remaining_estimate(m) == 96.0 * 3
+
+
+def test_overs_remaining_morning_uses_start_prior_from_close():
+    # Feed gave no start time: the prior (close − 7h = 11:00) still recognises
+    # the morning-before-play case, so a full day remains.
+    m = _fourth_innings_match(day=4, total=4, local="09:30", start="",
+                              close="18:00")
+    m.phase = Phase.STUMPS
+    assert overs_remaining_estimate(m) == 96.0
+
+
+def test_overs_remaining_morning_uses_default_prior_without_close():
+    # No start and no close: fall back to the plain 11:00 prior.
+    m = _fourth_innings_match(day=4, total=4, local="09:30", start="", close="")
+    m.phase = Phase.STUMPS
+    assert overs_remaining_estimate(m) == 96.0
+
+
+def test_overs_remaining_evening_stumps_no_start_still_zero():
+    # No start time, but it's the evening (past the prior): genuine end of day.
+    m = _fourth_innings_match(day=4, total=4, local="19:00", start="",
+                              close="18:00")
     m.phase = Phase.STUMPS
     assert overs_remaining_estimate(m) == 0.0
 

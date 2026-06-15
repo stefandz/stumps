@@ -463,15 +463,31 @@ def test_espn_standings_from_summary(settings):
     assert m2.standings is None
 
 
-def _freeze_today(monkeypatch, today):
-    """Pin date.today() inside espn.py so day-number logic is deterministic."""
+def _freeze_today(monkeypatch, today, utc_now=None):
+    """Pin the clocks inside espn.py so day-number logic is deterministic.
+
+    Freezes both ``date.today()`` (the no-clock fallback) and
+    ``datetime.now(tz)`` (the venue-date anchor). UTC defaults to noon on
+    ``today``, at which point any venue wall-clock resolves to ``today``; pass
+    ``utc_now`` to exercise cross-timezone date rollover."""
     from datetime import date as _date
+    from datetime import datetime as _datetime
+    from datetime import timezone as _timezone
 
     class _FrozenDate(_date):
         @classmethod
         def today(cls):
             return today
     monkeypatch.setattr("stumps.sources.espn.date", _FrozenDate)
+
+    frozen = utc_now or _datetime(today.year, today.month, today.day, 12, 0,
+                                  tzinfo=_timezone.utc)
+
+    class _FrozenDateTime(_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen if tz is None else frozen.astimezone(tz)
+    monkeypatch.setattr("stumps.sources.espn.datetime", _FrozenDateTime)
 
 
 def test_espn_parse_match_dates():
@@ -508,6 +524,7 @@ def test_espn_multiday_timing_from_notes(settings, monkeypatch):
     _freeze_today(monkeypatch, date(2026, 6, 9))
     src._apply_multiday_timing(match, summary)
     assert match.local_time == "16:30"
+    assert match.start_time == "10:00"
     assert match.close_time == "17:00"
     assert match.total_days == 4
     assert match.day_number == 3
@@ -528,6 +545,29 @@ def test_espn_multiday_day_one_with_no_closeofplay(settings, monkeypatch):
     src._apply_multiday_timing(match, summary)
     assert match.total_days == 4
     assert match.day_number == 1
+
+
+def test_espn_multiday_day_number_anchored_to_venue_timezone(settings, monkeypatch):
+    # A UTC+12 venue (e.g. New Zealand) at 10:00 local on day 3 is, in UTC,
+    # still 22:00 the previous day — so a machine on UTC reads "yesterday".
+    # The day number must follow the *venue's* date (day 3), not the machine's.
+    from datetime import datetime as _datetime
+    from datetime import timezone as _timezone
+
+    from stumps.models import Format, Match, Phase, Team
+    src = EspnSource(settings)
+    match = Match(match_id="m", format=Format.FIRST_CLASS, phase=Phase.LIVE,
+                  teams=[Team("New Zealand"), Team("England")])
+    summary = {
+        "header": {"competitions": [{"status": {"presentLocalTime": "10:00"}}]},
+        "notes": [{"type": "matchdays", "text": "7,8,9,10 June 2026 (4-day match)"}],
+    }
+    # Machine/UTC clock sits on 8 June 22:00 UTC; the venue has already ticked
+    # over to 9 June (day 3).
+    _freeze_today(monkeypatch, date(2026, 6, 8),
+                  utc_now=_datetime(2026, 6, 8, 22, 0, tzinfo=_timezone.utc))
+    src._apply_multiday_timing(match, summary)
+    assert match.day_number == 3  # venue date 9 June, not machine date 8 June
 
 
 def test_espn_multiday_timing_closeofplay_fallback(settings):

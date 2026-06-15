@@ -255,6 +255,7 @@ class Match:
     #: Wall-clock context at the ground, used to estimate overs left on the day
     #: for the multi-day win/draw model. HH:MM strings; empty when unknown.
     local_time: str = ""   # current local time at the venue
+    start_time: str = ""   # scheduled start of play
     close_time: str = ""   # scheduled close of play
     source: str = ""  # which data source produced this
     ball_by_ball_available: bool = False  # does the source expose commentary?
