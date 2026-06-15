@@ -181,8 +181,12 @@ sources/* ── Match objects ──> prioritise ──> render
   when present (exact at any stage) — but once an innings runs past the cap with
   no over data, it falls back to the current score and sets `approx` (an
   over-stating upper bound, rendered with a `~` and a caption). `render.console`
-  `_bonus_block` shows it in the `--match` detail only (a Bat/Bowl/Total mini-
-  table; a dash = that side's relevant innings hasn't happened yet).
+  `_bonus_block` shows it in the `--match` detail (a Bat/Bowl/Total mini-table;
+  a dash = that side's relevant innings hasn't happened yet); `_bonus_line` is the
+  compact one-line counterpart in the main report ("Bonus  Surrey +5 (2 bat ·
+  3 bowl) · …"), shown only while a match is live (a finished game shows the
+  official `points` note instead) and gated behind `Preferences.show_bonus` /
+  `--no-bonus`, default on.
 
 - **`winprob/`** — the home-grown win estimate (**not** WinViz; it's proprietary
   with no API — and its endpoints carry no probability field anyway). Two feature

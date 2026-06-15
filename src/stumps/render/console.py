@@ -744,6 +744,32 @@ def _bonus_block(match: Match, labels: bool = True) -> Group | None:
     return Group(*out)
 
 
+def _bonus_line(match: Match, labels: bool = True) -> Text | None:
+    """One-line summary of the first-innings bonus points each side will add —
+    "Bonus  Surrey +5 (2 bat · 3 bowl) · Lancashire +4 (1 bat · 3 bowl)". The
+    compact, in-list counterpart to `_bonus_block`; None when the competition has
+    no scheme we know. Computed, not official (see `bonus`)."""
+    rows = bonus.match_bonus(match)
+    if rows is None:
+        return None
+
+    def comp(value: float, seen: bool, mark: bool) -> str:
+        if not seen:
+            return "–"  # that innings hasn't happened yet
+        return f"{_fmt_points(value)}{'~' if mark and value else ''}"
+
+    parts = []
+    for r in rows:
+        breakdown = (f"{comp(r.batting, r.batting_seen, r.approx)} bat · "
+                     f"{comp(r.bowling, r.bowling_seen, r.approx)} bowl")
+        parts.append(f"{_plain_name(r.team, labels)} +{_fmt_points(r.total)} ({breakdown})")
+
+    txt = Text()
+    txt.append("Bonus  ", style="bold")
+    txt.append(" · ".join(parts), style="dim")
+    return txt
+
+
 def _standings_panel(standings: Standings, accent: str, labels: bool = True) -> Panel:
     rows = standings.rows
     # Multi-day tables have draws; limited-overs tables have a net run rate (and
@@ -843,6 +869,12 @@ def _match_panel(
     # In-play indicators (figures, DLS par, win probability) only make sense
     # while a match is active. Each is individually toggleable.
     if match.phase.is_active_today:
+        # Computed bonus points — only while live; a finished game shows the
+        # official `points` note above instead.
+        if prefs.show_bonus:
+            bonus_line = _bonus_line(match, labels)
+            if bonus_line is not None:
+                body.append(bonus_line)
         if prefs.show_figures:
             inns = match.current_innings
             if inns is not None:

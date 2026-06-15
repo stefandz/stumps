@@ -124,6 +124,8 @@ def _show_parser() -> argparse.ArgumentParser:
                    help="append the full league/points table for each competition shown")
     c.add_argument("--no-table", action="store_true",
                    help="hide the inline league positions of the two teams")
+    c.add_argument("--no-bonus", action="store_true",
+                   help="hide the computed first-innings bonus points")
     c.add_argument("--no-gender-labels", action="store_true",
                    help="don't label paired national sides by gender in the "
                         "match title (e.g. 'England Men v New Zealand Men')")

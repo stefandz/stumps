@@ -76,6 +76,7 @@ class Preferences:
     show_commentary: bool = True
     show_standings: bool = False  # append full league tables (--standings)
     show_table: bool = True  # inline league positions of the two teams (--no-table)
+    show_bonus: bool = True  # computed first-innings bonus points (--no-bonus)
     #: Label paired national sides by gender in the *match title* ("England Men v
     #: New Zealand Men"; women's titles already read "… Women" from the feed),
     #: while mentions *inside* the panel stay prosaic ("England") — the title has
@@ -155,6 +156,7 @@ class Preferences:
         prefs.show_dls = bool(config.get("dls", prefs.show_dls))
         prefs.show_commentary = bool(config.get("commentary", prefs.show_commentary))
         prefs.show_table = bool(config.get("table", prefs.show_table))
+        prefs.show_bonus = bool(config.get("bonus", prefs.show_bonus))
         prefs.show_finished = bool(config.get("finished", prefs.show_finished))
         prefs.show_upcoming = bool(config.get("upcoming", prefs.show_upcoming))
 
@@ -207,6 +209,8 @@ class Preferences:
         prefs.show_standings = prefs.show_standings or getattr(args, "standings", False)
         if getattr(args, "no_table", False):
             prefs.show_table = False
+        if getattr(args, "no_bonus", False):
+            prefs.show_bonus = False
         if getattr(args, "no_gender_labels", False):
             prefs.gender_labels = False
         if getattr(args, "no_live_pulse", False):

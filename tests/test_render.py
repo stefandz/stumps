@@ -348,6 +348,41 @@ def test_match_detail_shows_bonus_points():
     assert "Bat" in out and "Bowl" in out
 
 
+def test_general_view_shows_inline_bonus_line():
+    # Live county game: Surrey 312 (2 batting) + bowled Lancs out (3 bowling) = 5;
+    # Lancashire 280 (1 batting) + bowled Surrey out (3 bowling) = 4. Computed.
+    from stumps.models import Innings, Match, Team
+    m = Match("bl", Format.FIRST_CLASS, [Team("Surrey"), Team("Lancashire")],
+              phase=Phase.LIVE, series_name="County Championship Division One",
+              status_text="Lancashire trail",
+              innings=[
+                  Innings("Surrey", "Lancashire", 1, 312, 10, 95.2, all_out=True),
+                  Innings("Lancashire", "Surrey", 2, 280, 10, 88.0, all_out=True),
+                  Innings("Lancashire", "Surrey", 4, 50, 1, 12.0, target=183),
+              ])
+    out = _render(m, _settings())
+    assert "Bonus  Surrey +5 (2 bat · 3 bowl) · Lancashire +4 (1 bat · 3 bowl)" in out
+
+
+def test_inline_bonus_line_hidden_by_toggle():
+    from stumps.models import Innings, Match, Team
+    m = Match("bl2", Format.FIRST_CLASS, [Team("Surrey"), Team("Lancashire")],
+              phase=Phase.LIVE, series_name="County Championship Division One",
+              status_text="Surrey bat",
+              innings=[Innings("Surrey", "Lancashire", 1, 312, 5, 95.2)])
+    assert "Bonus" not in _render(m, _settings(), Preferences(show_bonus=False))
+
+
+def test_no_inline_bonus_line_for_finished_county_game():
+    # A finished game shows the official points note, not the computed estimate.
+    from stumps.models import Innings, Match, Team
+    m = Match("bf", Format.FIRST_CLASS, [Team("Surrey"), Team("Lancashire")],
+              phase=Phase.COMPLETE, series_name="County Championship Division One",
+              status_text="Surrey won", points="Surrey 22, Lancashire 4",
+              innings=[Innings("Surrey", "Lancashire", 1, 312, 10, 95.2, all_out=True)])
+    assert "Bonus  Surrey" not in _render(m, _settings())
+
+
 def test_no_bonus_block_for_non_bonus_competition():
     from stumps.models import Innings, Match, Team
     from stumps.render.console import render_match_detail

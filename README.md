@@ -184,6 +184,7 @@ winprob = true                        # win probability (--no-winprob)
 dls = true                            # DLS par score (--no-dls)
 commentary = true                     # recent balls (--no-commentary)
 table = true                          # inline league positions (--no-table)
+bonus = true                          # computed first-innings bonus points (--no-bonus)
 balls = 6                             # how many recent balls to show (--balls)
 test_model = false                    # use the trained multi-day model (--test-model)
 plain = false                         # disable colour (--plain)
@@ -337,13 +338,18 @@ little more for very high first-innings scores (300+). Always labelled
 
 ## Bonus points
 
-In a first-class match the `--match` detail shows the **batting & bowling bonus
-points each side has earned so far**. No feed exposes these live (they only
-appear once a game is finished), so they're **computed** from the competition's
-own scheme — currently the County Championship, Sheffield Shield and Plunket
-Shield — and labelled "computed, not official". Only first innings count, within
-each competition's over window; once an innings runs past that window without
-over-by-over data the figure can overstate, so it's flagged with a `~`.
+In a first-class match each side's **batting & bowling bonus points earned so
+far** are shown. No feed exposes these live (they only appear once a game is
+finished), so they're **computed** from the competition's own scheme — currently
+the County Championship, Sheffield Shield and Plunket Shield — and labelled
+"computed, not official". Only first innings count, within each competition's
+over window; once an innings runs past that window without over-by-over data the
+figure can overstate, so it's flagged with a `~`.
+
+While a match is live the main report carries a one-line summary
+(`Bonus  Surrey +5 (2 bat · 3 bowl) · …`); the `--match` detail expands it into a
+per-side Bat/Bowl/Total table. A finished game shows the official points note
+instead. Hide the inline line with `--no-bonus`.
 
 ## Tests
 
