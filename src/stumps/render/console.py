@@ -25,7 +25,10 @@ from stumps.winprob import estimate, extract_chase_state
 from stumps.winprob.estimator import WinEstimate
 
 _PHASE_STYLE = {
-    Phase.LIVE: ("● LIVE", "bold white on red"),
+    # `blink` makes the live badge pulse on an interactive terminal to reinforce
+    # that the match is active; rich strips it (with all styling) when piped, so
+    # polybar/tmux/file output stays clean.
+    Phase.LIVE: ("● LIVE", "bold white on red blink"),
     Phase.STUMPS: ("◐ STUMPS", "bold black on yellow"),
     Phase.BREAK: ("⏸ BREAK", "bold black on yellow"),
     Phase.COMPLETE: ("✓ RESULT", "bold white on green4"),
