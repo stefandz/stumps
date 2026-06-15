@@ -1,7 +1,7 @@
 """Tests for match classification, ranking policy, and preference-driven filters."""
 
 from stumps.models import Format, Match, Phase, Team
-from stumps.options import Preferences
+from stumps.options import TIER_FLOORS, Preferences
 from stumps.prioritise import (
     Tier,
     classify,
@@ -205,3 +205,58 @@ def test_boolean_toggles_from_config():
     # The flag still turns it on even if config omits/disables it.
     f = Preferences.resolve(SimpleNamespace(standings=True), {"standings": False})
     assert f.show_standings
+
+
+def test_full_config_parity():
+    from types import SimpleNamespace
+
+    from stumps.models import Format
+    # Every durable display/filter preference can be set purely from config.
+    cfg = {
+        "compact": True, "figures": False, "winprob": False, "dls": False,
+        "commentary": False, "table": False, "balls": 10, "test_model": True,
+        "plain": True, "width": 120, "tier": "premier", "format": ["test", "t20"],
+        "gender": "women", "series": "Ashes", "limit": 7, "live_only": True,
+        "finished": False, "upcoming": False, "include_warmups": True, "all": True,
+    }
+    p = Preferences.resolve(SimpleNamespace(), cfg)
+    assert p.compact and p.plain and p.live_only and p.include_warmups
+    assert not (p.show_figures or p.show_winprob or p.show_dls
+                or p.show_commentary or p.show_table or p.show_finished
+                or p.show_upcoming)
+    assert p.balls == 10 and p.width == 120 and p.limit == 7
+    assert p.use_multiday_model is True
+    assert p.gender == "women" and p.series_filter == "Ashes"
+    assert p.formats == {Format.TEST, Format.WTEST, Format.FIRST_CLASS,
+                         Format.T20I, Format.WT20I, Format.T20}
+    # --all forces the tier floor wide open; otherwise tier="premier" applies.
+    assert p.tier_floor == TIER_FLOORS["all"]
+    q = Preferences.resolve(SimpleNamespace(), {**cfg, "all": False})
+    assert q.tier_floor == TIER_FLOORS["premier"]
+
+
+def test_config_default_survives_when_no_flag():
+    from types import SimpleNamespace
+    # A config-set display toggle isn't clobbered by the absent flag.
+    p = Preferences.resolve(SimpleNamespace(), {"figures": False, "compact": True})
+    assert p.show_figures is False and p.compact is True
+
+
+def test_no_flags_override_config_on():
+    from types import SimpleNamespace
+    # config turns figures on (default) but the --no-figures flag still wins.
+    p = Preferences.resolve(SimpleNamespace(no_figures=True), {"figures": True})
+    assert p.show_figures is False
+
+
+def test_live_pulse_resolution():
+    from types import SimpleNamespace
+    # On by default.
+    assert Preferences.resolve(SimpleNamespace()).live_pulse is True
+    # CLI flag turns it off.
+    assert Preferences.resolve(SimpleNamespace(no_live_pulse=True)).live_pulse is False
+    # Config can set the default.
+    assert Preferences.resolve(SimpleNamespace(), {"live_pulse": False}).live_pulse is False
+    # CLI flag wins over a config that left it on.
+    assert Preferences.resolve(SimpleNamespace(no_live_pulse=True),
+                               {"live_pulse": True}).live_pulse is False

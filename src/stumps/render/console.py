@@ -136,10 +136,12 @@ def _break_badge_label(match: Match) -> str:
     return "⏸ BREAK"
 
 
-def _phase_badge(match: Match) -> Text:
+def _phase_badge(match: Match, pulse: bool = True) -> Text:
     label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
     if match.phase is Phase.BREAK:
         label = _break_badge_label(match)
+    if not pulse:
+        style = style.replace(" blink", "")
     return Text(f" {label} ", style=style)
 
 
@@ -587,10 +589,13 @@ def _winprob_block(est: WinEstimate, accent: str, labels: bool = True) -> Group:
     return Group(*rows)
 
 
-def _compact_line(match: Match, cls: Classification, labels: bool = True) -> Text:
+def _compact_line(match: Match, cls: Classification, labels: bool = True,
+                  pulse: bool = True) -> Text:
     """One-line-per-match summary for --compact."""
     accent = _accent(match, cls)
     label, style = _PHASE_STYLE.get(match.phase, ("?", "dim"))
+    if not pulse:
+        style = style.replace(" blink", "")
     line = Text()
     line.append(f"{label:<11}", style=style)
     line.append("  ")
@@ -793,7 +798,7 @@ def _headline_line(match: Match, labels: bool = True) -> Text | None:
 
 
 def _wrap_panel(match: Match, cls: Classification, body: list,
-                labels: bool = True) -> Panel:
+                labels: bool = True, pulse: bool = True) -> Panel:
     """Frame a body in the standard match panel (badge + title, subtitle, tier
     border). An empty body becomes a muted placeholder rather than an empty
     frame (e.g. a match listed before any scorecard exists)."""
@@ -804,7 +809,7 @@ def _wrap_panel(match: Match, cls: Classification, body: list,
             note = "No score yet" if match.phase.is_active_today else "Yet to start"
         body = [Text(note, style="dim italic")]
     title = Text()
-    title.append(_phase_badge(match))
+    title.append(_phase_badge(match, pulse))
     title.append("  ")
     title.append(_match_title(match, labels), style=f"bold {accent}")
     return Panel(Group(*body), title=title, title_align="left",
@@ -864,7 +869,7 @@ def _match_panel(
             if est is not None:
                 body.append(_winprob_block(est, accent, labels))
 
-    return _wrap_panel(match, cls, body, labels)
+    return _wrap_panel(match, cls, body, labels, prefs.live_pulse)
 
 
 def render_match_detail(
@@ -941,7 +946,7 @@ def render_match_detail(
     if match.officials:
         body.append(_labelled("Umpires", " · ".join(match.officials)))
 
-    console.print(_wrap_panel(match, cls, body, labels))
+    console.print(_wrap_panel(match, cls, body, labels, prefs.live_pulse))
 
 
 def render_report(
@@ -985,7 +990,8 @@ def render_report(
         console.rule(Text(title, style="bold"), align="left", style="dim")
         for match, cls in section:
             if prefs.compact:
-                console.print(_compact_line(match, cls, prefs.gender_labels),
+                console.print(_compact_line(match, cls, prefs.gender_labels,
+                                            prefs.live_pulse),
                               no_wrap=True, overflow="ellipsis")
             else:
                 console.print(_match_panel(match, cls, settings, prefs))

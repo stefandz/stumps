@@ -127,6 +127,8 @@ def _show_parser() -> argparse.ArgumentParser:
     c.add_argument("--no-gender-labels", action="store_true",
                    help="don't label paired national sides by gender in the "
                         "match title (e.g. 'England Men v New Zealand Men')")
+    c.add_argument("--no-live-pulse", action="store_true",
+                   help="don't pulse (blink) the live badge on a live match")
     c.add_argument("--balls", type=int, default=None, metavar="N",
                    help="how many recent balls to show (default 6)")
     c.add_argument("--test-model", action="store_true",
@@ -181,7 +183,7 @@ def _run_show(args: argparse.Namespace) -> int:
     prefs = Preferences.resolve(args, load_config_file())
     settings = load_settings()
     settings.region = prefs.region
-    console = Console(width=args.width, no_color=args.plain)
+    console = Console(width=prefs.width, no_color=prefs.plain)
     agg = Aggregator(settings, demo_only=args.demo)
     notify_state: dict = {}
 

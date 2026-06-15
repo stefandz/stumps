@@ -8,7 +8,12 @@ from stumps.config import Settings
 from stumps.models import Format, Phase
 from stumps.options import Preferences
 from stumps.prioritise import classify, prioritise
-from stumps.render.console import _match_panel, _synth_result, render_report
+from stumps.render.console import (
+    _match_panel,
+    _phase_badge,
+    _synth_result,
+    render_report,
+)
 from stumps.render.json_out import render_json
 from stumps.sources.aggregator import Aggregator
 from stumps.sources.fixtures import sample_matches
@@ -23,6 +28,15 @@ def _render(match, settings, prefs=None) -> str:
 
 def _settings():
     return Settings(cricketdata_api_key=None)
+
+
+def test_live_badge_pulses_unless_disabled():
+    live = next(m for m in sample_matches() if m.phase is Phase.LIVE)
+    assert "blink" in _phase_badge(live).style              # default: pulses
+    assert "blink" not in _phase_badge(live, pulse=False).style
+    # Non-live phases never blink, pulse on or off.
+    done = next(m for m in sample_matches() if m.phase is Phase.COMPLETE)
+    assert "blink" not in _phase_badge(done).style
 
 
 def test_no_winprob_for_completed_match():

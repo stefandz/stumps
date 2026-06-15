@@ -171,13 +171,38 @@ results_days = 2                      # days of past results to pull in (0 = off
 upcoming_days = 3                     # days of upcoming fixtures to pull in (0 = off)
 last_next = true                      # always show followed teams' last result + next fixture
 gender_labels = true                  # label paired national sides by gender in titles
+live_pulse = true                     # pulse (blink) the live badge on a live match
 notify = true                         # desktop alerts on a wicket/result (with --refresh)
 standings = true                      # always append league tables
 core_results = false                  # keep history to your core teams only
+
+# Every durable display/filter flag also has a config key, so a clean `stumps`
+# can behave like your favourite argumented call:
+compact = false                       # one line per match (--compact)
+figures = true                        # batting/bowling figures (--no-figures)
+winprob = true                        # win probability (--no-winprob)
+dls = true                            # DLS par score (--no-dls)
+commentary = true                     # recent balls (--no-commentary)
+table = true                          # inline league positions (--no-table)
+balls = 6                             # how many recent balls to show (--balls)
+test_model = false                    # use the trained multi-day model (--test-model)
+plain = false                         # disable colour (--plain)
+# width = 100                         # force console width (--width); omit = auto
+tier = "domestic"                     # lowest tier to show: followed|premier|domestic|all
+format = ["test", "odi", "t20"]       # restrict to format(s) (--format)
+gender = "men"                        # "men" or "women" only (--mens-only/--womens-only)
+series = "Ashes"                      # only series whose name contains this (--series)
+limit = 10                            # cap matches shown (--limit)
+live_only = false                     # only matches in play (--live-only)
+finished = true                       # show finished matches at all (--no-finished)
+upcoming = true                       # show upcoming matches at all (--no-upcoming)
+include_warmups = false               # treat World Cup warm-ups as premier (--include-warmups)
+all = false                           # show every match, not just ones of interest (--all)
 ```
 
-CLI flags override the config file (the boolean toggles can be turned *on* by
-their flag; to turn one off, drop it from the config).
+CLI flags override the config file: a value flag (e.g. `--tier`, `--limit`)
+wins when given, an on-only toggle (e.g. `--compact`) can only switch its key
+*on*, and a `--no-…` flag forces its key *off*.
 
 `--domestic` understands every ICC full member — `england`, `india`,
 `australia`, `pakistan`, `south-africa`, `new-zealand`, `sri-lanka`,
