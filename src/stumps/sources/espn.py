@@ -17,6 +17,7 @@ Field access is defensive; if ESPN changes shape we degrade rather than crash.
 from __future__ import annotations
 
 import re
+import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -233,15 +234,37 @@ class EspnSource(DataSource):
             elif month < 1:
                 month, year = 12, year - 1
 
+    def _scan_fetch(self, url: str, attempts: int = 3) -> dict:
+        """`_get` with a few quick retries to ride out ESPN's intermittent 5xx /
+        timeout flakiness on the month-scoreboard calls. Raises the final
+        `SourceError` if every attempt fails."""
+        for attempt in range(1, attempts + 1):
+            try:
+                return self._get(url)
+            except SourceError:
+                if attempt == attempts:
+                    raise
+                time.sleep(0.2 * attempt)
+        raise AssertionError("unreachable")  # pragma: no cover
+
     def _scan_months(self, object_id: str, today, forward: bool) -> Match | None:
         """Walk months from the current one outward and return the closest
-        upcoming fixture (`forward`) or most-recent finished result, or None."""
+        upcoming fixture (`forward`) or most-recent finished result, or None.
+
+        A month whose request keeps failing (ESPN 504s intermittently) *aborts*
+        the walk rather than being skipped: skipping a failed month would let a
+        much older match surface as the team's "latest" result — the current
+        month's call failing is exactly when an older month must not be trusted.
+        We retry to ride out transient failures, then give up (no bookend this
+        run) in preference to reporting something stale. A month that responds
+        with no relevant match is genuinely empty, so the walk continues past
+        it as before."""
         iso_today = today.isoformat()
         for year, month in self._months_from(today, forward):
             try:
-                data = self._get(f"{_SCOREBOARD}&team={object_id}&dates={year}{month:02d}")
+                data = self._scan_fetch(f"{_SCOREBOARD}&team={object_id}&dates={year}{month:02d}")
             except SourceError:
-                continue
+                break  # can't see this month -> better no result than a stale one
             best: Match | None = None
             for match in self._parse_scoreboard(data):
                 day = (match.starts_at or "")[:10]

@@ -842,6 +842,30 @@ def test_espn_scan_months_walks_to_adjacent_month(settings, monkeypatch):
     assert any("dates=202605" in u for u in seen)  # it walked back a month
 
 
+def test_espn_scan_months_failed_month_aborts_not_skips(settings, monkeypatch):
+    """A current-month request that keeps failing (ESPN 504s) must NOT surface a
+    months-old result: skipping the failed month would do exactly that."""
+    from datetime import date
+
+    src = EspnSource(settings)
+    monkeypatch.setattr("stumps.sources.espn.time.sleep", lambda *_: None)
+    seen = []
+
+    def fake_get(url):
+        seen.append(url)
+        if "dates=202606" in url:        # current month: ESPN is down
+            raise SourceError("ESPN returned HTTP 504")
+        if "dates=202603" in url:        # an old result that must not leak through
+            return _month_payload([_month_event("march", "2026-03-05", "post")])
+        return _month_payload([])
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    last = src._scan_months("1", date(2026, 6, 16), forward=False)
+    assert last is None  # aborted at the unreadable current month, no stale result
+    assert sum("dates=202606" in u for u in seen) == 3  # retried before giving up
+    assert not any("dates=202603" in u for u in seen)  # never walked back past it
+
+
 def test_espn_fetch_team_last_next_combines_and_filters_none(settings, monkeypatch):
     src = EspnSource(settings)
     assert src.fetch_team_last_next("") == []  # no id -> nothing
