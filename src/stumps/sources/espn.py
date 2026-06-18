@@ -307,7 +307,7 @@ class EspnSource(DataSource):
             # ("X won by N runs", "Match drawn", "Match tied") lives in
             # fullStatus.type.detail when present. Prefer whichever is descriptive
             # and let render.console._synth_result reconstruct one otherwise.
-            generic = ("", "result", "final")
+            generic = ("", "result", "final", "live")
             detail = _dig(event, "fullStatus", "type", "detail") or ""
             result = detail if detail.strip().lower() not in generic else status
             match.result_text = result
@@ -346,6 +346,15 @@ class EspnSource(DataSource):
             + " "
             + (_dig(event, "fullStatus", "type", "detail") or "")
         ).lower()
+        # A decided result is authoritative even when ESPN's `state` lags: the
+        # scoreboard keeps state="in" (and detail/summary "Live") for a window
+        # after a match ends, so a finished game would otherwise show as live.
+        # A competitor's `winner` boolean settles it -> COMPLETE, overriding both
+        # the stale "in" and any break/stumps keyword still left in the detail
+        # text. (Draws/ties carry no winner but reach state="post" cleanly, so
+        # the state check below catches them.)
+        if state == "post" or any(c.get("winner") for c in event.get("competitors") or []):
+            return Phase.COMPLETE
         if "stump" in detail:
             return Phase.STUMPS
         if any(w in detail for w in ("lunch", "tea", "drinks", "innings break", "rain", "bad light")):
@@ -354,8 +363,6 @@ class EspnSource(DataSource):
             return Phase.ABANDONED
         if state == "in":
             return Phase.LIVE
-        if state == "post":
-            return Phase.COMPLETE
         if state == "pre":
             return Phase.UPCOMING
         return Phase.UNKNOWN

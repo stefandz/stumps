@@ -239,6 +239,12 @@ def test_espn_phase_from_status():
     assert src._phase({"fullStatus": {"type": {"state": "in"}}, "summary": "Stumps Day 2"}) is Phase.STUMPS
     assert src._phase({"fullStatus": {"type": {"state": "post", "detail": "won"}}}) is Phase.COMPLETE
     assert src._phase({"fullStatus": {"type": {"state": "pre"}}}) is Phase.UPCOMING
+    # ESPN's `state` lags at "in" (detail still "Live") for a window after a
+    # match ends; a competitor's `winner` flag settles it as finished, not live.
+    lagged = {"fullStatus": {"type": {"state": "in", "detail": "Live"}},
+              "summary": "Live",
+              "competitors": [{"winner": True}, {"winner": False}]}
+    assert src._phase(lagged) is Phase.COMPLETE
 
 
 def test_espn_completed_prefers_result_detail(settings):
