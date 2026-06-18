@@ -18,3 +18,6 @@ htmlcov/
 # stumps runtime artifacts (cache, downloaded Cricsheet bundles, trained model)
 .cache/
 *.pkl
+
+# Locally-captured ESPN test fixtures (large; snapshot via capture_test_fixtures.py)
+tests/fixtures/espn/eng-nz-2ndtest-*.json
