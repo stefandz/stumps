@@ -399,6 +399,64 @@ def test_test_heuristic_third_innings_huge_lead_favours_batting_side():
     assert p["Leicestershire"] > p["Essex"]
 
 
+# -- innings 1-2 leans (real states from the Jun 2026 ENG v NZ 2nd Test) ----
+# These pin the projected-first-innings-lead fix: the raw aggregate lead used to
+# read a side still building its first innings as near-beaten. WinViz references
+# captured live at each moment.
+
+
+def _first_innings_match(*, bat_runs, bat_wkts, bat_overs, day=1, total=5):
+    """New Zealand alone have batted (or are batting) first — one-sided card."""
+    return Match(
+        match_id="engnz1", format=Format.TEST, phase=Phase.LIVE,
+        teams=[Team("New Zealand", "NZ"), Team("England", "ENG")],
+        day_number=day, total_days=total,
+        innings=[
+            Innings("New Zealand", "England", 1, bat_runs, bat_wkts, bat_overs),
+        ],
+    )
+
+
+def test_eng_nz_day1_first_innings_in_progress_is_a_coin_flip():
+    # NZ 291/7, end of day 1 (WinViz ENG 53 / draw 2 / NZ 45). A still-building
+    # first innings is a near coin-flip, not a draw-heavy stalemate.
+    p = estimate(_first_innings_match(bat_runs=291, bat_wkts=7, bat_overs=77.0,
+                                      day=1)).probabilities
+    assert p["Draw"] < 0.05                       # was ~15% pre-fix
+    assert 0.35 < p["New Zealand"] < 0.65         # neither side dominant
+    assert 0.35 < p["England"] < 0.65
+
+
+def test_eng_nz_first_innings_par_plus_total_leans_to_batting_side():
+    # NZ 391 all out (WinViz ENG 41 / draw 3 / NZ 56). An above-par total earns
+    # the batting side a modest lean — and the draw stays low with days left.
+    p = estimate(_first_innings_match(bat_runs=391, bat_wkts=10, bat_overs=96.2,
+                                      day=2)).probabilities
+    assert p["Draw"] < 0.05
+    assert p["New Zealand"] > p["England"]
+
+
+def test_eng_nz_second_innings_trailing_is_not_a_near_loss():
+    # THE regression: NZ 391 a.o.; England 118/2 in reply, ~273 behind but with
+    # 8 wickets standing (WinViz ENG 49 / draw 3 / NZ 48). Pre-fix the raw
+    # aggregate lead gave England *1%*; trailing in your own first innings is
+    # expected, so this must read as ~level.
+    m = Match(
+        match_id="engnz2", format=Format.TEST, phase=Phase.LIVE,
+        teams=[Team("New Zealand", "NZ"), Team("England", "ENG")],
+        day_number=2, total_days=5,
+        innings=[
+            Innings("New Zealand", "England", 1, 391, 10, 96.2, all_out=True, closed=True),
+            Innings("England", "New Zealand", 2, 118, 2, 27.0),
+        ],
+    )
+    p = estimate(m).probabilities
+    assert p["England"] > 0.40                    # was 0.01 pre-fix
+    assert p["Draw"] < 0.05
+    assert abs(p["England"] - p["New Zealand"]) < 0.20   # roughly level
+    assert abs(sum(p.values()) - 1.0) < 0.01
+
+
 # -- multi-day (Option B: model) --------------------------------------------
 
 

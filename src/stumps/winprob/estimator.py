@@ -274,21 +274,58 @@ def _third_innings_probs(state: MultiDayState) -> dict[str, float]:
     }
 
 
+#: Par first-innings total: the prior we judge a still-batting first innings
+#: against when the opponent hasn't batted (so there's no real lead to read yet).
+_FIRST_INNINGS_PAR = 350.0
+#: tanh divisor turning a projected first-innings lead into a [-1, 1] dominance.
+_PROJECTED_LEAD_SCALE = 150.0
+#: Below this fraction of the match remaining, a draw starts to become a real
+#: outcome; above it (lots of time left) a result is near-certain regardless of
+#: who's ahead, so the draw sits at the floor.
+_DRAW_TIME_KNEE = 0.5
+_DRAW_FLOOR = 0.02
+
+
+def _projected_first_innings_runs_per_wicket(wickets_in_hand: int) -> float:
+    """Runs a first-innings side adds per remaining wicket. Scaled by wickets in
+    hand: a top order intact (8+ left) projects ~32/wkt, a side down to its tail
+    (2-3 left) only ~24/wkt."""
+    return 20.0 + 1.6 * max(0, wickets_in_hand)
+
+
 def _early_innings_probs(state: MultiDayState) -> dict[str, float]:
-    """Innings 1–3: a lead-and-time lean. Plenty of overs left -> a result is
-    likely; running out of time with no dominance -> a draw."""
-    dominance = math.tanh(state.lead / 120.0)
-    # A one-sided scorecard (only one side has batted) isn't a real advantage.
-    if state.innings_number <= 1:
-        dominance *= 0.25
+    """Innings 1–2: a *projected*-lead-and-time lean.
+
+    The raw aggregate lead is the wrong object here: in the second innings the
+    side still batting is *expected* to trail until it completes its innings, so
+    a side 250 behind with 8 wickets standing is roughly level, not losing. We
+    project the batting side's first-innings total (current + a per-wicket prior)
+    and read dominance off the *projected* lead over the opponent. In the first
+    innings the opponent hasn't batted, so we compare the projected total against
+    a par prior instead.
+
+    Draw is a function of time, not evenness: with most of the match still to
+    come a result is near-certain however even the contest, so the draw only
+    climbs as the overs run down (and only when no side dominates)."""
+    projected_add = state.wickets_in_hand * _projected_first_innings_runs_per_wicket(
+        state.wickets_in_hand
+    )
+    if state.innings_number >= 2:
+        # Opponent has a completed first innings -> projected lead over them.
+        basis = state.lead + projected_add
+    else:
+        # One-sided scorecard -> projected total judged against par.
+        basis = (state.lead + projected_add) - _FIRST_INNINGS_PAR
+    dominance = math.tanh(basis / _PROJECTED_LEAD_SCALE)
 
     total_overs = max(1, state.total_days) * overs_per_day(
         # any multi-day format works for the per-day figure
         Format.TEST if state.total_days >= 5 else Format.FIRST_CLASS
     )
     fraction_left = min(1.0, state.overs_remaining / total_overs)
-    draw = (1 - abs(dominance)) * (0.6 - 0.5 * fraction_left)
-    draw = min(0.9, max(0.03, draw))
+    draw_time = max(0.0, (_DRAW_TIME_KNEE - fraction_left) / _DRAW_TIME_KNEE)
+    draw = (1 - abs(dominance)) * draw_time
+    draw = min(0.9, max(_DRAW_FLOOR, draw))
 
     share = 1 - draw
     return {

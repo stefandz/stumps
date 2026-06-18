@@ -73,16 +73,30 @@ def main(argv: list[str]) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"  (commentary fetch failed: {exc})")
 
+    # Digest, so you can confirm you grabbed the right moment.
+    match = src._event_to_match(event, league_id, "")
+    src.enrich(match)
+
+    # Stamp the as-of-capture timing. overs-remaining and the current day are
+    # derived from the *real clock*, so a fixture replayed days later would
+    # otherwise recompute a different (wrong) moment. Persist them so offline
+    # replay can pin the snapshot instead of re-deriving it.
+    captured_state = {
+        "day_number": match.day_number,
+        "total_days": match.total_days,
+        "overs_remaining": round(overs_remaining_estimate(match), 1),
+        "local_time": match.local_time,
+        "close_time": match.close_time,
+    }
+
     _FIXTURES.mkdir(parents=True, exist_ok=True)
     out = _FIXTURES / f"{safe_label}.json"
     out.write_text(json.dumps(
         {"query": query, "league_id": league_id, "event_id": event_id,
+         "captured_state": captured_state,
          "scoreboard_event": event, "summary": summary, "commentary_page1": commentary},
         indent=1), encoding="utf-8")
 
-    # Digest, so you can confirm you grabbed the right moment.
-    match = src._event_to_match(event, league_id, "")
-    src.enrich(match)
     print(f"captured {out.relative_to(_FIXTURES.parent.parent.parent)}")
     print(f"  {match.title}  [{match.phase.value}]  {match.format.value}")
     print(f"  day {match.day_number}/{match.total_days}  "
