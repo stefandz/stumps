@@ -180,12 +180,18 @@ def _first_innings_estimate(match: Match) -> WinEstimate | None:
 
 
 #: Fourth-innings target at which a chase's *absolute-size* feasibility is ~50%.
-#: Chasing is genuinely hard once the target climbs, even with time in hand —
-#: extra overs help the bowling side as much as the batting side. Calibrated to
-#: CricViz fourth-innings reads (a ~325 target ≈ 8% to chase, a 400+ target
-#: near-hopeless), so feasibility tapers from here rather than from the ~418
-#: record chase; the surplus probability becomes bowl-out vs draw.
-_CHASE_DIFFICULTY_MIDPOINT = 250.0
+#: The target a side is ~50% likely to chase ("difficulty midpoint") is not a
+#: constant — it scales with the *time* available. A 325 target is ~8% to chase
+#: in a single day (~96 overs) but a real proposition (~36% per CricViz) given
+#: two days, because extra overs let the chasers accumulate at a trivial rate
+#: without risk, not just give the bowlers more chances. So the midpoint rises
+#: from a one-day base by a per-over bonus (~+68 runs of chaseable target per
+#: extra day's batting), capped near the ~418 record chase. Calibrated to CricViz
+#: fourth-innings reads (325 ≈ 8% in a day, ≈ 36% in two; 400+ in a day near-
+#: hopeless); the surplus probability becomes bowl-out vs draw.
+_CHASE_MIDPOINT_BASE = 182.0          # 50/50 target with no overs (extrapolated)
+_CHASE_MIDPOINT_PER_OVER = 0.71       # +~68 runs per ~96-over day of batting
+_CHASE_MIDPOINT_CAP = 330.0           # never more chaseable than the record run-fest
 _CHASE_FEASIBILITY_SLOPE = 0.028
 #: Overs a side batting to save the game survives per wicket on a wearing
 #: fourth-innings pitch (a full innings ≈ 95 overs). Sets how readily the
@@ -219,10 +225,13 @@ def _chase_outcome(
     # fourth-innings rate; temper by wickets in hand.
     gettable = _logistic(1.1 * (4.5 - rrr))
     wkt_ok = _logistic(0.5 * (chaser_wih - 3))
-    # Absolute size matters too, independent of rate: a big fourth-innings target
-    # is hard to overhaul however many overs there are (the time instead helps the
-    # bowling side take wickets), so large targets taper away regardless of rrr.
-    feasible = _logistic(_CHASE_FEASIBILITY_SLOPE * (_CHASE_DIFFICULTY_MIDPOINT - target))
+    # Absolute size matters too, beyond the required rate: a big fourth-innings
+    # target taps out regardless of how gentle the rrr looks. But how big is "big"
+    # depends on the overs left — two days makes a 325 target a real chase where a
+    # day makes it a near-certain bowl-out (see the midpoint constants). The taper
+    # is therefore centred on a time-aware midpoint, not a fixed run figure.
+    midpoint = min(_CHASE_MIDPOINT_CAP, _CHASE_MIDPOINT_BASE + _CHASE_MIDPOINT_PER_OVER * overs)
+    feasible = _logistic(_CHASE_FEASIBILITY_SLOPE * (midpoint - target))
     p_chase = gettable * wkt_ok * feasible
     # Time to bowl them out? Compare the wickets the bowling side can expect to
     # take in the overs left against the standing wickets — enough favours a win,
