@@ -31,6 +31,7 @@ from stumps.prioritise import classify, prioritise
 from stumps.render import render_report
 from stumps.render.console import render_match_detail
 from stumps.render.json_out import render_json
+from stumps.render.loading import loading
 from stumps.sources.aggregator import Aggregator
 from stumps.sources.base import SourceError
 
@@ -195,10 +196,11 @@ def _run_show(args: argparse.Namespace) -> int:
             console.print(f"[dim]No match found for {query!r}.[/dim]")
             return
         if not args.no_enrich:
-            agg.enrich(result, [found])
-            # Hybrid: upgrade ESPN's dismissal mode to cricketdata's full
-            # "c X b Y" text where a key is set (silent if not / quota / no match).
-            agg.augment(found)
+            with loading(console, enabled=not prefs.json_output):
+                agg.enrich(result, [found])
+                # Hybrid: upgrade ESPN's dismissal mode to cricketdata's full
+                # "c X b Y" text where a key is set (silent if not / quota / no match).
+                agg.augment(found)
         cls = classify(found, prefs)
         if prefs.json_output:
             print(render_json(result, [(found, cls)], settings, prefs))
@@ -206,10 +208,11 @@ def _run_show(args: argparse.Namespace) -> int:
             render_match_detail(console, found, cls, settings, prefs)
 
     def run_once() -> None:
-        result = agg.fetch(lookback_days=prefs.results_days,
-                           upcoming_days=prefs.upcoming_days,
-                           followed_teams=prefs.followed_teams,
-                           last_next=prefs.followed_last_next)
+        with loading(console, enabled=not prefs.json_output):
+            result = agg.fetch(lookback_days=prefs.results_days,
+                               upcoming_days=prefs.upcoming_days,
+                               followed_teams=prefs.followed_teams,
+                               last_next=prefs.followed_last_next)
         if prefs.match_query:
             run_detail(result, prefs.match_query)
             return
@@ -229,10 +232,11 @@ def _run_show(args: argparse.Namespace) -> int:
             # 259/5d" to one innings per side), and any finished league game needs
             # it for the points awarded (only in the per-event summary). Upcoming
             # games don't need it.
-            agg.enrich(result, [
-                m for m, _ in ranked
-                if m.phase.is_active_today or m.phase is Phase.COMPLETE
-            ])
+            with loading(console, enabled=not prefs.json_output):
+                agg.enrich(result, [
+                    m for m, _ in ranked
+                    if m.phase.is_active_today or m.phase is Phase.COMPLETE
+                ])
         if prefs.notify:
             from stumps import notify
             events, new_state = notify.detect_events(notify_state, ranked)
