@@ -16,8 +16,11 @@ Field access is defensive; if ESPN changes shape we degrade rather than crash.
 
 from __future__ import annotations
 
+import math
 import re
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -111,18 +114,28 @@ class EspnSource(DataSource):
         self.cache = DiskCache(settings)
         self._session = None
 
-    def _get(self, url: str) -> dict:
-        cached = self.cache.get(url)
+    @staticmethod
+    def _new_session():
+        try:
+            from curl_cffi import requests as curl_requests
+        except ImportError as exc:  # pragma: no cover
+            raise SourceError("curl_cffi not installed (pip install curl_cffi)") from exc
+        return curl_requests.Session(impersonate="chrome")
+
+    def _get(self, url: str, ttl: int | None = None, session=None) -> dict:
+        """Fetch a URL → JSON, cached. ``ttl`` overrides the cache freshness
+        window (e.g. a long TTL for immutable commentary pages). ``session`` lets
+        a concurrent caller pass its own curl_cffi session, since a single shared
+        session is not safe to use from multiple threads at once."""
+        cached = self.cache.get(url, ttl)
         if cached is not None:
             return cached  # type: ignore[return-value]
-        if self._session is None:
-            try:
-                from curl_cffi import requests as curl_requests
-            except ImportError as exc:  # pragma: no cover
-                raise SourceError("curl_cffi not installed (pip install curl_cffi)") from exc
-            self._session = curl_requests.Session(impersonate="chrome")
+        if session is None:
+            if self._session is None:
+                self._session = self._new_session()
+            session = self._session
         try:
-            resp = self._session.get(url, timeout=self.settings.http_timeout_seconds)
+            resp = session.get(url, timeout=self.settings.http_timeout_seconds)
             if resp.status_code != 200:
                 raise SourceError(f"ESPN returned HTTP {resp.status_code}")
             data = resp.json()
@@ -407,7 +420,28 @@ class EspnSource(DataSource):
             self._apply_multiday_timing(match, data)
         if match.ball_by_ball_available and match.phase.is_active_today:
             match.recent_balls = self._recent_balls(match.match_id)
+        if match.phase.is_active_today:
+            self._backfill_current_manhattan(match)
         return match
+
+    def _backfill_current_manhattan(self, match: Match) -> None:
+        """Rebuild the current innings' over-by-over manhattan from commentary
+        when ESPN's summary couldn't supply it. ESPN duplicates a side's *first*-
+        innings over data into its *second* innings (the 3rd/4th innings of the
+        match), so `_over_scores` drops it as the wrong innings and leaves the
+        current-innings sparkline blank — only a team batting twice is affected,
+        so the rebuild is gated on innings ≥ 3 and never costs a request earlier.
+
+        Not gated on `ball_by_ball_available`: ESPN's `playByPlayAvailable` flag
+        is an unreliable false-negative on some matches that *do* serve full
+        commentary, so we try regardless and degrade silently to a blank
+        manhattan (one wasted page fetch) when commentary genuinely isn't there."""
+        cur = match.current_innings
+        if cur is None or cur.number < 3 or cur.over_scores or cur.overs <= 0:
+            return
+        rebuilt = self._commentary_over_scores(match.match_id, cur.number, cur.overs)
+        if rebuilt:
+            cur.over_scores = rebuilt
 
     @staticmethod
     def _apply_points(match: Match, data: dict) -> None:
@@ -536,6 +570,14 @@ class EspnSource(DataSource):
         (a list of {number, runs, wicket[...]}), in over order."""
         overs = (ls.get("statistics") or {}).get("overs") or []
         rows = overs[0] if overs and isinstance(overs[0], list) else []
+        # ESPN sometimes duplicates a side's *earlier*-innings manhattan into a
+        # later innings' linescore (a team batting twice gets innings 1's 97 over
+        # rows planted in its 2.2-over third innings). The row count must track the
+        # overs actually bowled, so when it wildly exceeds them the block belongs to
+        # another innings — drop it rather than draw a manhattan for the wrong one.
+        overs_played = _to_float(ls.get("overs"))
+        if overs_played and len(rows) > int(overs_played) + 2:
+            return []
         return [OverScore(runs=_to_int(o.get("runs")),
                           wickets=len(o.get("wicket") or [])) for o in rows]
 
@@ -632,6 +674,92 @@ class EspnSource(DataSource):
                 pass
         balls = [self._ball(it) for it in items if it.get("over")]
         return list(reversed(balls))[:limit]  # newest first
+
+    #: How far back the commentary-rebuilt manhattan reaches, in overs. The fetch
+    #: is bounded by this: a longer innings shows only its most recent overs (its
+    #: tail), which keeps the worst-case load time predictable. 150 overs covers
+    #: any realistic third/fourth innings.
+    _MANHATTAN_MAX_OVERS = 150
+    #: Concurrency for the tail-page fetch. ESPN tolerates a burst of this size
+    #: comfortably; it bounds the wall-clock to roughly one round-trip per worker.
+    _COMMENTARY_WORKERS = 6
+
+    def _commentary_over_scores(
+        self, event_id: str, period: int, overs: float
+    ) -> list[OverScore]:
+        """Rebuild one innings' over-by-over manhattan from ball-by-ball
+        commentary, for when ESPN's summary `statistics.overs` carries the wrong
+        innings' copy. Commentary paginates oldest-first at 25 balls/page, so the
+        innings lives in the *tail* pages; we fetch only those (concurrently,
+        capped at `_MANHATTAN_MAX_OVERS`) and collapse this `period`'s balls by
+        over number — each ball carries its over's running runs/wickets total."""
+        try:
+            first = self._get(_PLAYBYPLAY.format(event=event_id, page=1))
+        except SourceError:
+            return []
+        com = first.get("commentary") or {}
+        page_size = _to_int(com.get("pageSize"), 25) or 25
+        last_page = _to_int(com.get("pageCount"), 1)
+
+        capped = min(overs, self._MANHATTAN_MAX_OVERS)
+        balls = int(math.ceil(capped)) * 6 + page_size  # + a page of slack
+        span = max(1, math.ceil(balls / page_size))
+
+        # The cached page-1 `pageCount` can lag the live match by a page or two,
+        # which would make us fetch a stale tail window and miss the latest overs.
+        # The freshly-fetched tail pages each report the *live* pageCount, so trust
+        # that and top up any newer pages it reveals (at most a round or two).
+        pages: dict[int, dict] = {}
+        for _ in range(3):
+            wanted = [p for p in range(max(1, last_page - span + 1), last_page + 1)
+                      if p not in pages]
+            if not wanted:
+                break
+            for page, page_com in self._fetch_commentary_pages(event_id, wanted, last_page):
+                pages[page] = page_com
+            live_last = max((_to_int(c.get("pageCount"), last_page) for c in pages.values()),
+                            default=last_page)
+            if live_last <= last_page:
+                break
+            last_page = live_last
+
+        by_over: dict[int, OverScore] = {}
+        for page_com in pages.values():
+            for it in page_com.get("items") or []:
+                if _to_int(it.get("period")) != period:
+                    continue
+                over = it.get("over") or {}
+                n = _to_int(over.get("number"))
+                if n:
+                    by_over[n] = OverScore(runs=_to_int(over.get("runs")),
+                                           wickets=_to_int(over.get("wickets")))
+        return [by_over[n] for n in sorted(by_over)]
+
+    def _fetch_commentary_pages(
+        self, event_id: str, pages: list[int], last_page: int
+    ) -> list[tuple[int, dict]]:
+        """Fetch the given commentary pages concurrently, returning (page,
+        commentary) pairs. Pages before the last are immutable — their 25 balls
+        never change once bowled — so they cache for a week; only the live last
+        page keeps the short default TTL. Each worker thread uses its own
+        curl_cffi session, since one shared session isn't safe across threads."""
+        week = 7 * 24 * 3600
+        local = threading.local()
+
+        def fetch(page: int) -> tuple[int, dict]:
+            url = _PLAYBYPLAY.format(event=event_id, page=page)
+            ttl = None if page >= last_page else week
+            session = getattr(local, "session", None)
+            if session is None:
+                session = local.session = self._new_session()
+            try:
+                data = self._get(url, ttl=ttl, session=session)
+            except SourceError:
+                return page, {}
+            return page, (data.get("commentary") or {})
+
+        with ThreadPoolExecutor(max_workers=self._COMMENTARY_WORKERS) as ex:
+            return list(ex.map(fetch, pages))
 
     @staticmethod
     def _ball(item: dict) -> Ball:

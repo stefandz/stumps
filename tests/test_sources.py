@@ -1,5 +1,6 @@
 """Source normalisers and aggregator fallback (no network)."""
 
+import re
 from datetime import date
 
 import pytest
@@ -406,6 +407,47 @@ def test_espn_over_scores_from_linescore(settings):
     assert [o.runs for o in ov] == [5, 9, 0]
     assert ov[1].wickets == 1 and ov[0].wickets == 0
     assert src._over_scores({}) == []
+
+
+def test_espn_over_scores_drops_wrong_innings_manhattan(settings):
+    # ESPN plants a side's first-innings manhattan into its third-innings
+    # linescore when it bats twice: 97 over rows on a 2.2-over innings. The block
+    # can't belong here, so it's dropped rather than drawn for the wrong innings.
+    src = EspnSource(settings)
+    rows = [{"number": str(n), "runs": "4", "wicket": []} for n in range(1, 98)]
+    assert src._over_scores({"overs": "2.2", "statistics": {"overs": [rows]}}) == []
+    # A block consistent with the overs bowled is kept.
+    kept = src._over_scores({"overs": "3.0", "statistics": {"overs": [rows[:3]]}})
+    assert len(kept) == 3
+
+
+def test_espn_commentary_over_scores_rebuilds_current_innings(settings, monkeypatch):
+    # When the summary block is dropped, the current innings' manhattan is rebuilt
+    # from commentary: collapse this period's balls by over, ignoring other innings.
+    src = EspnSource(settings)
+    monkeypatch.setattr(src, "_new_session", lambda: None)  # patched _get ignores it
+
+    def ball(period, over_n, runs, wkts=0):
+        return {"period": period, "over": {"number": str(over_n), "runs": str(runs), "wickets": wkts}}
+
+    def page(items, page_count):
+        return {"commentary": {"pageSize": 25, "pageCount": page_count, "items": items}}
+
+    # Current innings is period 3 (pages 2-3). Page 1's pageCount is *stale* (2);
+    # the freshly-fetched tail reports the live count (3), so page 3 is topped up.
+    pages = {
+        1: page([ball(1, 1, 5)], 2),                    # earlier innings — ignored
+        2: page([ball(3, 1, 4), ball(3, 2, 7, 1)], 3),  # live pageCount = 3
+        3: page([ball(3, 3, 2)], 3),
+    }
+
+    def fake_get(url, ttl=None, session=None):
+        return pages[int(re.search(r"page=(\d+)", url).group(1))]
+
+    monkeypatch.setattr(src, "_get", fake_get)
+    ov = src._commentary_over_scores("E", period=3, overs=3.0)
+    assert [o.runs for o in ov] == [4, 7, 2]   # period-1 over excluded, in over order
+    assert ov[1].wickets == 1                  # the over's wicket carried through
 
 
 def test_espn_fall_of_wickets_from_linescore(settings):

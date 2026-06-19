@@ -107,6 +107,27 @@ sources/* ── Match objects ──> prioritise ──> render
     "Today/Yesterday" tag. Finished games are tier-scoped for free: the
     live-international catch-all is live-only, so only followed/domestic/premier
     results survive `prioritise` (no associate-results flood).
+  - **The over-by-over manhattan has two data traps.** (1) ESPN duplicates a
+    side's *first*-innings `statistics.overs` block into its *second* innings
+    (the 3rd/4th innings of a match) — byte-identical, no per-row innings marker —
+    so `_over_scores` drops a block whose row count can't match the overs bowled
+    rather than draw the wrong innings' manhattan. (2) For the current innings it
+    then rebuilds the real manhattan from ball-by-ball commentary
+    (`_commentary_over_scores`): commentary paginates oldest-first (25 balls/page,
+    each ball carrying its `period` + an `over` object), so the innings lives in
+    the *tail* pages, fetched **concurrently** (`_fetch_commentary_pages`, own
+    session per thread) and collapsed by over for the current `period`. Bounded by
+    `_MANHATTAN_MAX_OVERS` (150; ~1.1s cold worst case, ~30ms warm), gated on
+    innings ≥ 3 (only a side batting twice is affected, so innings 1–2 never cost
+    a request). The cached page-1 `pageCount` can lag the live match, so the
+    *live* count reported by the freshly-fetched tail is trusted and newer pages
+    topped up. Immutable pages (before the last) cache for a week; only the live
+    last page keeps the short TTL. **Not** gated on `playByPlayAvailable` —
+    ESPN's flag is an unreliable false-negative on matches that do serve full
+    commentary, so the rebuild is attempted regardless and degrades to a blank
+    manhattan (one wasted page fetch) when commentary genuinely isn't there. Only
+    the *current* innings is rebuilt; an older 2nd-time innings (innings 3 when 4
+    is live) still shows blank in the `--match` view.
   - **The live JSON shapes are reverse-engineered and unstable.** Every field
     access is defensive (`_dig`, `.get`) and degrades to partial data. When a
     live run returns empty/odd data, the fix is almost always in a normaliser
