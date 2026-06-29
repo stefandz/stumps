@@ -8,7 +8,7 @@ from stumps.config import Settings
 from stumps.models import Format, Innings, Match, Phase, Team
 from stumps.winprob import estimate, extract_chase_state
 from stumps.winprob.cricsheet import chase_rows_from_match, multiday_rows_from_match
-from stumps.winprob.estimator import heuristic_chase_prob
+from stumps.winprob.estimator import _chase_outcome, heuristic_chase_prob
 from stumps.winprob.multiday import (
     FEATURE_ORDER_MD,
     extract_multiday_state,
@@ -293,6 +293,20 @@ def test_test_heuristic_draw_dominant_in_dead_fourth_innings():
     assert est.probabilities["Draw"] > 0.85
     assert est.probabilities["Surrey"] < 0.15
     assert abs(sum(est.probabilities.values()) - 1.0) < 1e-6
+
+
+def test_chase_outcome_time_up_with_wickets_is_a_draw_not_a_bowling_win():
+    # Regression: when the overs run out with the chaser still holding wickets,
+    # the match is DRAWN (the batting side survived) — not a bowling-side win.
+    # The old code returned (0, 1, 0) for both "all out" and "time up", flipping
+    # a near-certain draw to 100% to the bowling side as the clock estimate hit 0.
+    assert _chase_outcome(257, 0.0, 5) == (0.0, 0.0, 1.0)   # time up, wkts in hand
+    assert _chase_outcome(257, 20.0, 0) == (0.0, 1.0, 0.0)  # bowled out -> bowling win
+    # And it's continuous: at one over left a survival-bound chase is mostly a draw,
+    # so dropping to zero overs should not discontinuously hand it to the bowlers.
+    _, p_bowl_one_over, p_draw_one_over = _chase_outcome(257, 1.0, 5)
+    assert p_draw_one_over > 0.9
+    assert p_bowl_one_over < 0.1
 
 
 def test_test_heuristic_gettable_chase_favours_batting_side():

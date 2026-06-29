@@ -217,8 +217,10 @@ def _chase_outcome(
     third-innings position."""
     if target <= 0:                    # target already overhauled / no lead to defend
         return 1.0, 0.0, 0.0
-    if chaser_wih <= 0 or overs <= 0:  # innings over / time up, target not reached
+    if chaser_wih <= 0:                # bowled out, target not reached -> bowling win
         return 0.0, 1.0, 0.0
+    if overs <= 0:                     # time up *with wickets in hand* -> draw, not a
+        return 0.0, 0.0, 1.0           # bowling win: the chaser survived the overs
 
     rrr = target / overs               # runs per over required
     # Can the target realistically be chased? ~4.5 rpo is a stiff-but-doable
