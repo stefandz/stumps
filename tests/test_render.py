@@ -30,6 +30,26 @@ def _settings():
     return Settings(cricketdata_api_key=None)
 
 
+def test_all_out_innings_shows_overs():
+    # Bowled out in fewer than the full allocation — overs must appear.
+    from stumps.models import Innings, Match, Team
+    from stumps.render.console import render_match_detail
+    m = Match("ao", Format.T20I, [Team("England"), Team("India")],
+              phase=Phase.COMPLETE, status_text="England won by 5 runs",
+              result_text="England won by 5 runs",
+              innings=[
+                  Innings("England", "India", 1, 150, 7, 20.0, closed=True),
+                  Innings("India", "England", 2, 145, 10, 18.3, all_out=True, closed=True),
+              ])
+    # Scores line (summary panel)
+    out = _render(m, _settings())
+    assert "(18.3 ov)" in out
+    # Detail header
+    c = Console(width=90, record=True)
+    render_match_detail(c, m, classify(m), _settings(), Preferences())
+    assert "(18.3 ov)" in c.export_text()
+
+
 def test_live_badge_pulses_unless_disabled():
     live = next(m for m in sample_matches() if m.phase is Phase.LIVE)
     assert "blink" in _phase_badge(live).style              # default: pulses

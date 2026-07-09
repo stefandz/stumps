@@ -230,7 +230,7 @@ def _scores_line(match: Match, labels: bool = True) -> Text:
             txt.append("   ")
         txt.append(f"{_plain_name(inns.batting_team, labels)} ", style="bold")
         txt.append(inns.score)
-        if inns.overs and not inns.all_out:
+        if inns.overs:
             txt.append(f" ({inns.overs:.1f} ov)", style="dim")
     return txt
 
@@ -936,7 +936,7 @@ def render_match_detail(
         head = Text(f"{_ordinal(inns.number)} innings — "
                     f"{_plain_name(inns.batting_team, labels)} {inns.score}",
                     style=f"bold {accent}")
-        if inns.overs and not inns.all_out:
+        if inns.overs:
             head.append(f"  ({inns.overs:.1f} ov)", style="dim")
         body.append(head)
         bat = _batting_table(inns, full=True)
